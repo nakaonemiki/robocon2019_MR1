@@ -1,6 +1,6 @@
 /************************************************/
 // 
-// 長さの単位はmmとする
+// 長さの単位はmとする
 // 
 /************************************************/
 
@@ -12,11 +12,13 @@
 #include "PIDclass.h"
 #include "Filter.h"
 
+// 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
 phaseCounter Enc2(2);
 phaseCounter Enc3(3);
 
-// MDインスタンス化させたほうがいい?
+// RoboClaw
+RoboClaw MD(&Serial2,10);
 
 PID velPIDA(0.0, 0.0, 0.0, INT_TIME);
 PID velPIDB(0.0, 0.0, 0.0, INT_TIME);
@@ -29,14 +31,17 @@ PID posiPIDz(0.0, 0.0, 0.0, INT_TIME);
 PID yokozurePID(0.0, 0.0, 0.0, INT_TIME);
 PID kakudoPID(0.0, 0.0, 0.0, INT_TIME);
 
+// 二次遅れ使えるようになる
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
+// ベジエ曲線用
 double Px[22] = { 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
 double Py[22] = { 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
 
 double refvel[7] = {0.5,0.5,0.5,0.5,0.3,0.5,0.5};
 
+// ベジエ曲線関連
 double Ax[7];
 double Bx[7];
 double Cx[7];
@@ -47,6 +52,7 @@ double By[7];
 double Cy[7];
 double Dy[7];
 
+// 内積関連
 double a_be[7];
 double b_be[7];
 double c_be[7];
@@ -109,6 +115,12 @@ double min_max(double value, double minmax)
     return value;
 }
 
+void Mecanum_command(double duty[4]){
+  MD.SpeedM1(ADR_MD1, (int)(duty[3])*M_CMD);
+  MD.SpeedM2(ADR_MD1, (int)(duty[2])*M_CMD);
+  MD.SpeedM1(ADR_MD2, (int)(duty[1])*M_CMD);
+  MD.SpeedM2(ADR_MD2, (int)(duty[0])*M_CMD);
+}
 
 void timer_warikomi(){
 	static int count = 0;
@@ -138,6 +150,29 @@ void timer_warikomi(){
 	gPosiy += Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz ) );
 	gPosiz += Posiz;
 	
+	// ベジエ曲線
+	if( phase < 2 ){
+		double tmpx = Px[phase*3] - gPosix;
+        double tmpy = Py[phase*3] - gPosiy;
+		
+		d_be[phase] = d_be_[phase] + Ax[phase] * tmpx + Ay[phase] * tmpy;
+        e_be[phase] = e_be_[phase] + 2*Bx[phase] * tmpx + 2*By[phase] * tmpy;
+        f_be[phase] = f_be_[phase] + Cx[phase] * tmpx + Cy[phase] * tmpy;
+		
+		int count_newton = 0;
+        do {
+            t_be = pre_t_be - func(phase, pre_t_be)/dfunc(phase, pre_t_be);
+            epsilon = abs((t_be - pre_t_be)/pre_t_be);
+            
+            //if(t_be < 0) t_be = 0.0;
+            //else if(t_be > 1.0) t_be = 1.0;
+            
+            pre_t_be = t_be;
+            count_newton++;
+        }while(epsilon >= 1e-4 && count_newton <= 50);
+	} else {
+		
+	}
 	
 	pre_EncountA = EncountA;
 	pre_EncountB = EncountB;
@@ -157,10 +192,13 @@ void setup() {
 	Enc2.init();
 	Enc3.init();
 	
+	// RoboClaw
+	MD.begin(115200);
+	
 	// PCと通信
 	Serial.begin(115200);
 	
-	//
+	// PID関連初期化
 	velPIDA.PIDinit(0.0, 0.0);
 	velPIDB.PIDinit(0.0, 0.0);
 	velPIDC.PIDinit(0.0, 0.0);
@@ -172,12 +210,33 @@ void setup() {
 	yokozurePID.PIDinit(0.0, 0.0);
 	kakudoPID.PIDinit(0.0, 0.0);
 	
+	for(int i = 0; i < 7; i++) {
+        Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
+        Ay[i] = Py[3*i+3] -3*Py[3*i+2] + 3*Py[3*i+1] - Py[3*i+0];
+        Bx[i] = Px[3*i+2] -2*Px[3*i+1] + Px[3*i+0];
+        By[i] = Py[3*i+2] -2*Py[3*i+1] + Py[3*i+0];
+        Cx[i] = Px[3*i+1] - Px[3*i+0];
+        Cy[i] = Py[3*i+1] - Py[3*i+0];
+        Dx[i] = Px[3*i+0];
+        Dy[i] = Py[3*i+0];
+    }
+
+    for(int i = 0; i < 7; i++) {
+        a_be[i] = pow(Ax[i], 2.0) + pow(Ay[i], 2.0);
+        b_be[i] = 5*(Ax[i]*Bx[i] + Ay[i]*By[i]);
+        c_be[i] = 2*((3*pow(Bx[i],2.0)+2*Ax[i]*Cx[i]) + (3*pow(By[i],2.0)+2*Ay[i]*Cy[i]));
+        d_be_[i] = 9*Bx[i]*Cx[i] + 9*By[i]*Cy[i];
+        e_be_[i] = 3*pow(Cx[i],2.0) + 3*pow(Cy[i],2.0);
+        f_be_[i] = 0;
+    }
+	
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
 	MsTimerTPU3::start();
 }
 
 
+// reboot用関数
 void reboot_function(){
 	system_reboot(REBOOT_USERAPP);
 }
