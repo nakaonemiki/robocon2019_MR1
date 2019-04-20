@@ -19,28 +19,41 @@ phaseCounter Enc2(2);
 phaseCounter Enc3(3);
 
 // RoboClaw
-RoboClaw MD(&Serial2,10);
+//RoboClaw MD(&Serial2,5);//10);
 
-PID velPIDA(0.0, 0.0, 0.0, INT_TIME);
-PID velPIDB(0.0, 0.0, 0.0, INT_TIME);
-PID velPIDC(0.0, 0.0, 0.0, INT_TIME);
+PID posiPIDx(7.0, 0.0, 0.0, INT_TIME);
+PID posiPIDy(6.0, 0.0, 0.0, INT_TIME);
+PID posiPIDz(9.0, 0.0, 0.0, INT_TIME);
 
-PID posiPIDx(0.0, 0.0, 0.0, INT_TIME);
-PID posiPIDy(0.0, 0.0, 0.0, INT_TIME);
-PID posiPIDz(0.0, 0.0, 0.0, INT_TIME);
-
-PID yokozurePID(0.0, 0.0, 0.0, INT_TIME);
-PID kakudoPID(0.0, 0.0, 0.0, INT_TIME);
+PID yokozurePID(1.5, 0.0, 0.0, INT_TIME);
+PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 
 // 二次遅れ使えるようになる
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
 // ベジエ曲線用
-double Px[22] = { 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
-double Py[22] = { 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
+double Px[22] = /* P0が頭 */
+	/* 0 */{ 0.50, 0.50, 1.515,
+	/* 1 */1.525, 1.525, 0.925, 
+	/* 2 */0.925, 0.925, 1.525, 
+	/* 3 */1.525, 1.525, 1.225, 
+	/* 4 */1.225, 1.225, 1.225, 
+	/* 5 */1.225, 1.225, 3.0, 
+	/* 6 */4.0, 5.8, 6.0, 
+	/* 7 */6.0 };
+//{ 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
+double Py[22] = 
+	/* 0 */{ 0.50, 1.50, 1.00, 
+	/* 1 */2.00, 3.00, 2.50, 
+	/* 2 */3.50, 4.50, 4.00, 
+	/* 3 */5.00, 6.00, 5.75, 
+	/* 4 */6.50, 7.25, 7.50, 
+	/* 5 */8.00, 10.0, 8.30, 
+	/* 6 */8.30, 8.30, 8.30, 
+	/* 7 */8.30 };//{ 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
 
-double refvel[7] = {0.5,0.5,0.5,0.5,0.3,0.5,0.5};
+double refvel[7] = {0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5};
 
 // ベジエ曲線関連
 double Ax[7];
@@ -71,11 +84,11 @@ double epsilon = 1.0;
 double refVxg, refVyg, refVzg; // グローバル座標系の指定速度
 int EncountA = 0, EncountB = 0, EncountC = 0;
 int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
+int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
 
-
 // グローバル変数の設定
-double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0;
+double gPosix = Px[0], gPosiy = Py[0], gPosiz = 1.57080;//0;
 
 
 // tを求めるための方程式
@@ -145,25 +158,30 @@ void timer_warikomi(){
     // 自己位置推定用エンコーダのカウント値取得
     EncountA = -Enc1.getCount();	// MTU1, xl
     EncountB = -Enc2.getCount();	// MTU2, y
-    EncountC = Enc3.getCount();	// TPU1, xr
+    EncountC =  Enc3.getCount();	// TPU1, xr
 	
 	// 角度   encountはdoubleに型変換した方がいいかもしれない
 	double Kakudoxl, Kakudoxr, Kakudoy;
-	Kakudoxl = ( double )( EncountA - pre_EncountA ) * 2.0 * PI / MEASURE_RES_MUL_X;
-	Kakudoxr = ( double )( EncountC - pre_EncountC ) * 2.0 * PI / MEASURE_RES_MUL_X;
-	Kakudoy  = ( double )( EncountB - pre_EncountB ) * 2.0 * PI / MEASURE_RES_MUL_Y;
-	
-	// static double tmpKakudoxl = 0.0, tmpKakudoxr = 0.0, tmpKakudoy = 0.0;
-	// tmpKakudoxl += Kakudoxl;
-	// tmpKakudoxr += Kakudoxr;
-	// tmpKakudoy  += Kakudoy;
+	Kakudoxl = ( double )( EncountA - pre_EncountA ) * _2PI_MEASRMX;
+	Kakudoxr = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;
+	Kakudoy  = ( double )( EncountB - pre_EncountB ) * _2PI_MEASRMY;
 	
 	// ローカル用(zは角度)
 	double Posix, Posiy, Posiz;
-	Posiz = MEASURE_HANKEI * ( Kakudoxr - Kakudoxl ) * 0.5 / MEASURE_HANKEI_D;
-	Posix = MEASURE_HANKEI * 0.5 * ( Kakudoxl + Kakudoxr );
-	Posiy = MEASURE_HANKEI * Kakudoy - MEASURE_HANKEI_L * Posiz;//( MEASURE_HANKEI / 3.0 ) * ( ( 2.0 * Kakudoy ) + ( ( MEASURE_HANKEI_L * ( Kakudoxr - Kakudoxl ) ) / MEASURE_HANKEI_D ) );
+	double Posixl, Posixr;
+	Posiz = ( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;
+	Posix = ( MEASURE_HANKEI_X_L * Kakudoxl + MEASURE_HANKEI_X_R * Kakudoxr ) * 0.5;
+	Posixl = MEASURE_HANKEI_X_L * Kakudoxl;
+	Posixr = MEASURE_HANKEI_X_R * Kakudoxr;
+	Posiy = MEASURE_HANKEI_Y * Kakudoy - MEASURE_HANKEI_L * Posiz;
 	
+	// static double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
+	// tmpPosix += Posix;
+	// tmpPosixl += Posixl;
+	// tmpPosixr += Posixr;
+	// tmpPosiy += Posiy;
+	// tmpPosiz += Posiz;
+
 	// グローバル用(zは角度)
 	double tmp_Posiz = gPosiz + ( Posiz * 0.5 ); // つまりgPosi + ( Posiz / 2.0 );
 	gPosix += Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
@@ -172,8 +190,9 @@ void timer_warikomi(){
 	
 	double refVx, refVy, refVz;
 	
+	double onx, ony;    //ベジエ曲線上の点
 	// ベジエ曲線
-	if( phase < 2 ){
+	if( phase < 7 ){
 		double tmpx = Px[phase*3] - gPosix;
         double tmpy = Py[phase*3] - gPosiy;
 		
@@ -193,7 +212,7 @@ void timer_warikomi(){
             count_newton++;
         }while(epsilon >= 1e-4 && count_newton <= 50);
 		
-		double onx, ony;    //ベジエ曲線上の点
+		//double onx, ony;    //ベジエ曲線上の点
         onx = bezier_x(phase, t_be);
         ony = bezier_y(phase, t_be);
 		
@@ -203,26 +222,16 @@ void timer_warikomi(){
         double dist;
         dist = (ony - gPosiy)*cos(angle) - (onx - gPosix)*sin(angle);
 		
-		double refVtan, refVper, refKakudo, refVrot;
+		double refVtan, refVper, refVrot;
         refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
         refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
         //refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
         refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
 		
-		// グローバル座標系の指令速度
-        // refVxg = refVtan * cos(angle) - refVper * sin(angle);
-        // refVyg = refVtan * sin(angle) + refVper * cos(angle);
-        // refVzg = refVrot;
-        
-        // ローカル座標系の指令速度
-        // refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
-        // refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
-        // refVz =  refVzg;
-        
 		// ローカル座標系の指令速度(グローバル座標系のも込み込み)
 		refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
 		refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
-		refVz = refVrot;
+		refVz = refVrot;//0.628319;だと10秒で旋回？
 		
         double syusoku;
         syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
@@ -234,8 +243,8 @@ void timer_warikomi(){
         epsilon = 1.0;
 	} else {
 		// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-        refVxg = posiPIDx.getCmd(Px[6], gPosix, refvel[phase]);//(Px[21], gPosix, refvel[phase]);
-        refVyg = posiPIDy.getCmd(Py[6], gPosiy, refvel[phase]);//(Py[21], gPosiy, refvel[phase]);
+        refVxg = posiPIDx.getCmd(Px[21], gPosix, refvel[phase]);
+        refVyg = posiPIDy.getCmd(Py[21], gPosiy, refvel[phase]);
         refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
 
         // 上記はグローバル座標系における速度のため，ローカルに変換
@@ -243,41 +252,94 @@ void timer_warikomi(){
         refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
         refVz =  refVzg;
 	}
-	
+
 	// ローカル速度から，各車輪の角速度を計算
 	double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
-	refOmegaA = ( refVx - refVy -refVz * ( MECANUM_HANKEI_D + MECANUM_HANKEI_L ) ) / MECANUM_HANKEI;
-	refOmegaB = ( refVx + refVy -refVz * ( MECANUM_HANKEI_D + MECANUM_HANKEI_L ) ) / MECANUM_HANKEI;
-	refOmegaC = ( refVx - refVy +refVz * ( MECANUM_HANKEI_D + MECANUM_HANKEI_L ) ) / MECANUM_HANKEI;
-	refOmegaD = ( refVx + refVy +refVz * ( MECANUM_HANKEI_D + MECANUM_HANKEI_L ) ) / MECANUM_HANKEI;
+	refOmegaA = ( refVx - refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左前
+	refOmegaB = ( refVx + refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左後
+	refOmegaC = ( refVx - refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右後
+	refOmegaD = ( refVx + refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右前
+	//double refSokudo = 0.1;// [ m/s ]
+	//refOmegaA = refSokudo / MECANUM_HANKEI;
+	//refOmegaB = refSokudo / MECANUM_HANKEI;
+	//refOmegaC = refSokudo / MECANUM_HANKEI;
+	//refOmegaD = refSokudo / MECANUM_HANKEI;
+
+	double mdCmdA, mdCmdB, mdCmdC, mdCmdD;
+	mdCmdA = refOmegaA * _2MECAR_PI;
+	mdCmdB = refOmegaB * _2MECAR_PI;
+	mdCmdC = refOmegaC * _2MECAR_PI;
+	mdCmdD = refOmegaD * _2MECAR_PI;
 	
 	// 速度制御のためのコマンドをPIDクラスから得る
 	// 最大値を超えていた場合に制限をかける
-	
+
 	// モータにcmd?を送り，回す
-	// MD.SpeedM1(ADR_MD1, (int)(duty[3])*M_CMD);
-	// MD.SpeedM2(ADR_MD1, (int)(duty[2])*M_CMD);
-	// MD.SpeedM1(ADR_MD2, (int)(duty[1])*M_CMD);
-	// MD.SpeedM2(ADR_MD2, (int)(duty[0])*M_CMD);
-	
+	MD.SpeedM1(ADR_MD1,  (int)mdCmdB);// 左後
+	MD.SpeedM2(ADR_MD1, -(int)mdCmdC);// 右後
+	MD.SpeedM1(ADR_MD2,  (int)mdCmdA);// 左前
+	MD.SpeedM2(ADR_MD2, -(int)mdCmdD);// 右前
+
 	pre_EncountA = EncountA;
 	pre_EncountB = EncountB;
 	pre_EncountC = EncountC;
+
+	// pre_tmpEncA = tmpEncA;
+	// pre_tmpEncB = tmpEncB;
+	// pre_tmpEncC = tmpEncC;
 	
 	
-	/* Serial.print( "MTU1:" );
-	Serial.print( EncountA );
+	/* Serial.print( "refX:" );
 	Serial.print( "\t" );
-	Serial.print( "MTU2:" );
-	Serial.print( EncountB );
+	Serial.print( gPosiz , 4);
 	Serial.print( "\t" );
-	Serial.print( "TPU1:" );
-	Serial.println( EncountC ); */
-	Serial.print( gPosix );
+	Serial.print( "vel:" );
+	Serial.print( "\t" );
+	Serial.println( refVzg , 4 ); */
+	/* Serial.print( gPosix );
 	Serial.print( "\t" );
 	Serial.print( gPosiy );
 	Serial.print( "\t" );
-	Serial.println( gPosiz );
+	Serial.println( gPosiz ); */
+	/* Serial.print( "k_L:" );
+	Serial.print( tmpKakudoxl, 4 );
+	Serial.print( "\t" );
+	Serial.print( "k_R:" );
+	Serial.print( tmpKakudoxr, 4 ); */
+	//Serial.print( "b_x:" );
+	//Serial.print( onx, 2 );
+	//Serial.print( "\t" );
+	//Serial.print( "b_y:" );
+	//Serial.print( ony, 2 );
+	//Serial.print( "\t" );
+	/* Serial.print( "v_x:" );
+	Serial.print( refVx, 2 );
+	Serial.print( ", " );
+	Serial.print( "v_y:" );
+	Serial.print( refVy, 2 );
+	Serial.print( ", " );
+	Serial.print( "v_z:" );
+	Serial.print( refVz, 2 );
+	Serial.print( ", " ); */
+	//Serial.print( "g_x:" );
+	//Serial.print( gPosix, 2 );
+	//Serial.print( "\t" );
+	//Serial.print( "g_y:" );
+	//Serial.print( gPosiy, 2 );
+	//Serial.print( "\t" );
+	//Serial.print( "g_z:" );
+	//Serial.println(phase);//( gPosiz, 2 );
+
+
+	/*Serial.print( onx, 2 );
+	Serial.print( "\t" );
+	Serial.print( ony, 2 );
+	Serial.print( "\t" );
+	Serial.print( gPosix, 2 );
+	Serial.print( "\t" );
+	Serial.print( gPosiy, 2 );
+	Serial.print( "\t" );
+	Serial.println(phase);//( gPosiz, 2 );*/
 }
 
 
@@ -287,23 +349,14 @@ void setup() {
     pinMode(PIN_LED1, OUTPUT);
 	pinMode(PIN_LED2, OUTPUT);
     pinMode(PIN_LED3, OUTPUT);
-	
-	// 自己位置推定用のエンコーダ
-	Enc1.init();
-	Enc2.init();
-	Enc3.init();
-	
+
 	// RoboClaw
-	MD.begin(115200);
-	
+	//MD.begin(115200);
+
 	// PCと通信
 	Serial.begin(115200);
 	
 	// PID関連初期化
-	velPIDA.PIDinit(0.0, 0.0);
-	velPIDB.PIDinit(0.0, 0.0);
-	velPIDC.PIDinit(0.0, 0.0);
-	
 	posiPIDx.PIDinit(0.0, 0.0);
 	posiPIDy.PIDinit(0.0, 0.0);
 	posiPIDz.PIDinit(0.0, 0.0);
@@ -330,10 +383,15 @@ void setup() {
         e_be_[i] = 3*pow(Cx[i],2.0) + 3*pow(Cy[i],2.0);
         f_be_[i] = 0;
     }
-	
+
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
 	MsTimerTPU3::start();
+
+	// 自己位置推定用のエンコーダ
+	Enc1.init();
+	Enc2.init();
+	Enc3.init();
 }
 
 
