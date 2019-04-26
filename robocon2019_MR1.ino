@@ -19,7 +19,7 @@ phaseCounter Enc2(2);
 phaseCounter Enc3(3);
 
 // RoboClaw
-//RoboClaw MD(&Serial2,5);//10);
+RoboClaw MD(&Serial2,5);//10);
 
 PID posiPIDx(7.0, 0.0, 0.0, INT_TIME);
 PID posiPIDy(6.0, 0.0, 0.0, INT_TIME);
@@ -53,7 +53,7 @@ double Py[22] =
 	/* 6 */8.30, 8.30, 8.30, 
 	/* 7 */8.30 };//{ 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
 
-double refvel[7] = {0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5};
+double refvel[7] = {0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5};
 
 // ベジエ曲線関連
 double Ax[7];
@@ -86,6 +86,19 @@ int EncountA = 0, EncountB = 0, EncountC = 0;
 int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
+
+int tenCount = 9;//0;
+boolean tenFlag = false;
+
+int data1[ 1300 ];//[ 12000 ];
+int data2[ 1300 ];
+int data3[ 1300 ];
+int data4[ 1300 ];
+
+int *pdata1 = data1;
+int *pdata2 = data2;
+int *pdata3 = data3;
+int *pdata4 = data4;
 
 // グローバル変数の設定
 double gPosix = Px[0], gPosiy = Py[0], gPosiz = 1.57080;//0;
@@ -142,10 +155,9 @@ void timer_warikomi(){
 	static double pre_EncountA = 0.0, pre_EncountB = 0.0, pre_EncountC = 0.0;
     static double preAngleA = 0.0, preAngleB = 0.0, preAngleC = 0.0;
     static double preVxl = 0.0, preVyl = 0.0, preVzl = 0.0;
-    static int phase = 0;
     count++;
 	
-	if(ledcount >= 25) {
+	if(ledcount >= 100) {
 		if(digitalRead(PIN_LED0) == LOW){
 			digitalWrite(PIN_LED0, HIGH);
 		} else {
@@ -188,97 +200,16 @@ void timer_warikomi(){
 	gPosiy += Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
 	gPosiz += Posiz;
 	
-	double refVx, refVy, refVz;
 	
-	double onx, ony;    //ベジエ曲線上の点
-	// ベジエ曲線
-	if( phase < 7 ){
-		double tmpx = Px[phase*3] - gPosix;
-        double tmpy = Py[phase*3] - gPosiy;
-		
-		d_be[phase] = d_be_[phase] + Ax[phase] * tmpx + Ay[phase] * tmpy;
-        e_be[phase] = e_be_[phase] + 2*Bx[phase] * tmpx + 2*By[phase] * tmpy;
-        f_be[phase] = f_be_[phase] + Cx[phase] * tmpx + Cy[phase] * tmpy;
-		
-		int count_newton = 0;
-        do {
-            t_be = pre_t_be - func(phase, pre_t_be)/dfunc(phase, pre_t_be);
-            epsilon = abs((t_be - pre_t_be)/pre_t_be);
-            
-            //if(t_be < 0) t_be = 0.0;
-            //else if(t_be > 1.0) t_be = 1.0;
-            
-            pre_t_be = t_be;
-            count_newton++;
-        }while(epsilon >= 1e-4 && count_newton <= 50);
-		
-		//double onx, ony;    //ベジエ曲線上の点
-        onx = bezier_x(phase, t_be);
-        ony = bezier_y(phase, t_be);
-		
-		// 外積による距離導出
-        double angle;
-        angle = atan2(dbezier_y(phase, t_be), dbezier_x(phase, t_be)); // ベジエ曲線の接線方向
-        double dist;
-        dist = (ony - gPosiy)*cos(angle) - (onx - gPosix)*sin(angle);
-		
-		double refVtan, refVper, refVrot;
-        refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
-        refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
-        //refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
-        refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
-		
-		// ローカル座標系の指令速度(グローバル座標系のも込み込み)
-		refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
-		refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
-		refVz = refVrot;//0.628319;だと10秒で旋回？
-		
-        double syusoku;
-        syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
-        if(syusoku <= 0.05 || t_be >= 0.997){
-            phase++;
-            pre_t_be = 0.1;
-        }
-        
-        epsilon = 1.0;
-	} else {
-		// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-        refVxg = posiPIDx.getCmd(Px[21], gPosix, refvel[phase]);
-        refVyg = posiPIDy.getCmd(Py[21], gPosiy, refvel[phase]);
-        refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
 
-        // 上記はグローバル座標系における速度のため，ローカルに変換
-        refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
-        refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
-        refVz =  refVzg;
+	tenCount++;
+
+	if( tenCount == 10 ){
+		tenFlag = true;
+		tenCount = 0;
 	}
 
-	// ローカル速度から，各車輪の角速度を計算
-	double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
-	refOmegaA = ( refVx - refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左前
-	refOmegaB = ( refVx + refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左後
-	refOmegaC = ( refVx - refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右後
-	refOmegaD = ( refVx + refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右前
-	//double refSokudo = 0.1;// [ m/s ]
-	//refOmegaA = refSokudo / MECANUM_HANKEI;
-	//refOmegaB = refSokudo / MECANUM_HANKEI;
-	//refOmegaC = refSokudo / MECANUM_HANKEI;
-	//refOmegaD = refSokudo / MECANUM_HANKEI;
-
-	double mdCmdA, mdCmdB, mdCmdC, mdCmdD;
-	mdCmdA = refOmegaA * _2MECAR_PI;
-	mdCmdB = refOmegaB * _2MECAR_PI;
-	mdCmdC = refOmegaC * _2MECAR_PI;
-	mdCmdD = refOmegaD * _2MECAR_PI;
 	
-	// 速度制御のためのコマンドをPIDクラスから得る
-	// 最大値を超えていた場合に制限をかける
-
-	// モータにcmd?を送り，回す
-	MD.SpeedM1(ADR_MD1,  (int)mdCmdB);// 左後
-	MD.SpeedM2(ADR_MD1, -(int)mdCmdC);// 右後
-	MD.SpeedM1(ADR_MD2,  (int)mdCmdA);// 左前
-	MD.SpeedM2(ADR_MD2, -(int)mdCmdD);// 右前
 
 	pre_EncountA = EncountA;
 	pre_EncountB = EncountB;
@@ -351,7 +282,7 @@ void setup() {
     pinMode(PIN_LED3, OUTPUT);
 
 	// RoboClaw
-	//MD.begin(115200);
+	MD.begin(115200);
 
 	// PCと通信
 	Serial.begin(115200);
@@ -396,13 +327,177 @@ void setup() {
 
 
 // reboot用関数
-void reboot_function(){
+/* void reboot_function(){
 	system_reboot(REBOOT_USERAPP);
-}
+} */
 
 
 void loop() {
-	if(!digitalRead(PIN_SW)){
+	static int dataCount = 0;
+	
+	/* if( !digitalRead(PIN_SW) ){
 		reboot_function();
+	} */
+
+	if( tenFlag ){
+		static int phase = 0;
+		double refVx, refVy, refVz;
+	
+		double onx, ony;    //ベジエ曲線上の点
+
+		// ベジエ曲線
+		if( phase < 7 ){
+			double tmpx = Px[phase*3] - gPosix;
+			double tmpy = Py[phase*3] - gPosiy;
+			
+			d_be[phase] = d_be_[phase] + Ax[phase] * tmpx + Ay[phase] * tmpy;
+			e_be[phase] = e_be_[phase] + 2*Bx[phase] * tmpx + 2*By[phase] * tmpy;
+			f_be[phase] = f_be_[phase] + Cx[phase] * tmpx + Cy[phase] * tmpy;
+			
+			int count_newton = 0;
+			do {
+				t_be = pre_t_be - func(phase, pre_t_be)/dfunc(phase, pre_t_be);
+				epsilon = abs((t_be - pre_t_be)/pre_t_be);
+				
+				//if(t_be < 0) t_be = 0.0;
+				//else if(t_be > 1.0) t_be = 1.0;
+				
+				pre_t_be = t_be;
+				count_newton++;
+			}while(epsilon >= 1e-4 && count_newton <= 50);
+			
+			//double onx, ony;    //ベジエ曲線上の点
+			onx = bezier_x(phase, t_be);
+			ony = bezier_y(phase, t_be);
+			
+			// 外積による距離導出
+			double angle;
+			angle = atan2(dbezier_y(phase, t_be), dbezier_x(phase, t_be)); // ベジエ曲線の接線方向
+			double dist;
+			dist = (ony - gPosiy)*cos(angle) - (onx - gPosix)*sin(angle);
+			
+			double refVtan, refVper, refVrot;
+			refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
+			refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
+			//refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
+			refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
+			
+			// ローカル座標系の指令速度(グローバル座標系のも込み込み)
+			refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
+			refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
+			refVz = refVrot;//0.628319;だと10秒で旋回？
+			
+			double syusoku;
+			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
+			if(syusoku <= 0.05 || t_be >= 0.997){
+				phase++;
+				pre_t_be = 0.1;
+			}
+			
+			epsilon = 1.0;
+		} else {
+			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
+			refVxg = posiPIDx.getCmd(Px[21], gPosix, refvel[phase]);
+			refVyg = posiPIDy.getCmd(Py[21], gPosiy, refvel[phase]);
+			refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
+
+			// 上記はグローバル座標系における速度のため，ローカルに変換
+			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
+			refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
+			refVz =  refVzg;
+		}
+
+		// ローカル速度から，各車輪の角速度を計算
+		double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
+		refOmegaA = ( refVx - refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左前
+		refOmegaB = ( refVx + refVy -refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 左後
+		refOmegaC = ( refVx - refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右後
+		refOmegaD = ( refVx + refVy +refVz * ( _MECAHD_ADD_MECAHL ) ) / MECANUM_HANKEI;// 右前
+		//double refSokudo = 0.1;// [ m/s ]
+		//refOmegaA = refSokudo / MECANUM_HANKEI;
+		//refOmegaB = refSokudo / MECANUM_HANKEI;
+		//refOmegaC = refSokudo / MECANUM_HANKEI;
+		//refOmegaD = refSokudo / MECANUM_HANKEI;
+
+		double mdCmdA, mdCmdB, mdCmdC, mdCmdD;
+		mdCmdA = refOmegaA * _2MECAR_PI;
+		mdCmdB = refOmegaB * _2MECAR_PI;
+		mdCmdC = refOmegaC * _2MECAR_PI;
+		mdCmdD = refOmegaD * _2MECAR_PI;
+		
+		// 速度制御のためのコマンドをPIDクラスから得る
+		// 最大値を超えていた場合に制限をかける
+
+		static int dataFlag = 0;
+		static int dataend = 0;
+		/* if( dataFlag  || dataend ){
+			mdCmdA = 0;
+			mdCmdB = 0;
+			mdCmdC = 0;
+			mdCmdD = 0;
+		} */
+
+		// モータにcmd?を送り，回す
+		MD.SpeedM1(ADR_MD1,  (int)mdCmdB);// 左後
+		MD.SpeedM2(ADR_MD1, -(int)mdCmdC);// 右後
+		MD.SpeedM1(ADR_MD2,  (int)mdCmdA);// 左前
+		MD.SpeedM2(ADR_MD2, -(int)mdCmdD);// 右前
+
+		/* static int printcount = 0;
+		printcount++;
+		if(printcount == 10){
+			Serial.print( onx, 2 );
+			Serial.print( "\t" );
+			Serial.print( ony, 2 );
+			Serial.print( "\t" );
+			Serial.print( gPosix, 2 );
+			Serial.print( "\t" );
+			Serial.println( gPosiy, 2 );
+			printcount = 0;
+		} */
+		//Serial.print( "\t" );
+		//Serial.println(phase);//( gPosiz, 2 );
+
+		
+
+		if( dataCount < 1200){//11990 ){
+			*(pdata1 + dataCount) = ( int )( onx * 1000 );
+			//dataCount++;
+			*(pdata2 + dataCount) = ( int )( ony * 1000 );
+			//dataCount++;
+			*(pdata3 + dataCount) = ( int )( gPosix * 1000 );
+			//dataCount++;
+			*(pdata4 + dataCount) = ( int )( gPosiy * 1000 );
+			dataCount++;
+			/* *(pdata + dataCount) = ( int )( ony * 1000 );
+			dataCount++; */
+			/* *(pdata + dataCount) = ( int )( gPosix * 1000 );
+			dataCount++;
+			*(pdata + dataCount) = ( int )( gPosiy * 1000 );
+			dataCount++; */
+		}else{
+			//dataFlag = 1;
+		}
+
+
+
+		if( !digitalRead(PIN_SW) ){//if( dataFlag && !dataend ){
+			for( int forcount = 0; forcount < 1200 ; forcount++ ){
+				//Serial.print(forcount);
+				//Serial.print("\t");
+				Serial.print( *(pdata1 + forcount) );
+				Serial.print("\t");
+				Serial.print( *(pdata2 + forcount) );
+				Serial.print("\t");
+				Serial.print( *(pdata3 + forcount) );
+				Serial.print("\t");
+				Serial.println( *(pdata4 + forcount) );
+				if( forcount == 1199 ){
+					dataend = true;
+				}
+			}
+		}
+
+		tenFlag = false;
 	}
 }

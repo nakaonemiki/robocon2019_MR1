@@ -1,7 +1,7 @@
 #include "Arduino.h"
 
 // 制御周期
-#define INT_TIME			( 0.01 )
+#define INT_TIME			( 0.001 )
 
 // 自己位置推定用エンコーダ関連
 #define MEASURE_HANKEI		( 0.01905 )//( 19.05 )	// エンコーダの半径
