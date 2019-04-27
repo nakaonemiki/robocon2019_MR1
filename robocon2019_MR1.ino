@@ -44,7 +44,7 @@ double Px[22] = /* P0が頭 */
 	/* 7 */6.0 };
 //{ 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
 double Py[22] = 
-	/* 0 */{ 0.50, 1.50, 1.00, 
+	/* 0 */{ 0.50, 5.5/* 1.50 */, 1.00, 
 	/* 1 */2.00, 3.00, 2.50, 
 	/* 2 */3.50, 4.50, 4.00, 
 	/* 3 */5.00, 6.00, 5.75, 
@@ -53,7 +53,7 @@ double Py[22] =
 	/* 6 */8.30, 8.30, 8.30, 
 	/* 7 */8.30 };//{ 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
 
-double refvel[7] = {0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5};
+double refvel[7] = {0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.2,0.2,0.2,0.2,0.2,0.2,0.2};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
 
 // ベジエ曲線関連
 double Ax[7];
@@ -99,6 +99,12 @@ int *pdata1 = data1;
 int *pdata2 = data2;
 int *pdata3 = data3;
 int *pdata4 = data4;
+
+/* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
+double Posix, Posiy, Posiz;
+double Posixl, Posixr;
+double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0; */
+
 
 // グローバル変数の設定
 double gPosix = Px[0], gPosiy = Py[0], gPosiz = 1.57080;//0;
@@ -168,9 +174,9 @@ void timer_warikomi(){
 	ledcount++;
 
     // 自己位置推定用エンコーダのカウント値取得
-    EncountA = -Enc1.getCount();	// MTU1, xl
-    EncountB = -Enc2.getCount();	// MTU2, y
-    EncountC =  Enc3.getCount();	// TPU1, xr
+    EncountA = -Enc1.getCount();//-Enc1.getCount();	// MTU1, xl
+    EncountB = -Enc2.getCount();//-Enc2.getCount();	// MTU2, y
+    EncountC =  Enc3.getCount();// Enc3.getCount();	// TPU1, xr
 	
 	// 角度   encountはdoubleに型変換した方がいいかもしれない
 	double Kakudoxl, Kakudoxr, Kakudoy;
@@ -178,6 +184,8 @@ void timer_warikomi(){
 	Kakudoxr = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;
 	Kakudoy  = ( double )( EncountB - pre_EncountB ) * _2PI_MEASRMY;
 	
+	// tmpKakudoy += Kakudoy;
+
 	// ローカル用(zは角度)
 	double Posix, Posiy, Posiz;
 	double Posixl, Posixr;
@@ -187,12 +195,12 @@ void timer_warikomi(){
 	Posixr = MEASURE_HANKEI_X_R * Kakudoxr;
 	Posiy = MEASURE_HANKEI_Y * Kakudoy - MEASURE_HANKEI_L * Posiz;
 	
-	// static double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
-	// tmpPosix += Posix;
-	// tmpPosixl += Posixl;
-	// tmpPosixr += Posixr;
-	// tmpPosiy += Posiy;
-	// tmpPosiz += Posiz;
+	static double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
+	tmpPosix += Posix;
+	tmpPosixl += Posixl;
+	tmpPosixr += Posixr;
+	tmpPosiy += Posiy;
+	tmpPosiz += Posiz;
 
 	// グローバル用(zは角度)
 	double tmp_Posiz = gPosiz + ( Posiz * 0.5 ); // つまりgPosi + ( Posiz / 2.0 );
@@ -344,9 +352,9 @@ void loop() {
 		double refVx, refVy, refVz;
 	
 		double onx, ony;    //ベジエ曲線上の点
-
+		
 		// ベジエ曲線
-		if( phase < 7 ){
+		/* if( phase < 7 ){
 			double tmpx = Px[phase*3] - gPosix;
 			double tmpy = Py[phase*3] - gPosiy;
 			
@@ -385,7 +393,7 @@ void loop() {
 			// ローカル座標系の指令速度(グローバル座標系のも込み込み)
 			refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
 			refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
-			refVz = refVrot;//0.628319;だと10秒で旋回？
+			refVz =  refVrot;//0.628319;だと10秒で旋回？
 			
 			double syusoku;
 			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
@@ -395,17 +403,17 @@ void loop() {
 			}
 			
 			epsilon = 1.0;
-		} else {
+		} else { */
 			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-			refVxg = posiPIDx.getCmd(Px[21], gPosix, refvel[phase]);
-			refVyg = posiPIDy.getCmd(Py[21], gPosiy, refvel[phase]);
-			refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
+			refVxg = posiPIDx.getCmd(Px[1], gPosix, refvel[phase]);//(Px[21], gPosix, refvel[phase]);
+			refVyg = posiPIDy.getCmd(Py[1], gPosiy, refvel[phase]);//(Py[21], gPosiy, refvel[phase]);
+			refVzg = posiPIDz.getCmd(1.57080, gPosiz, refvel[phase]);
 
 			// 上記はグローバル座標系における速度のため，ローカルに変換
 			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
 			refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
 			refVz =  refVzg;
-		}
+		//}
 
 		// ローカル速度から，各車輪の角速度を計算
 		double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
@@ -438,10 +446,10 @@ void loop() {
 		} */
 
 		// モータにcmd?を送り，回す
-		MD.SpeedM1(ADR_MD1,  (int)mdCmdB);// 左後
-		MD.SpeedM2(ADR_MD1, -(int)mdCmdC);// 右後
-		MD.SpeedM1(ADR_MD2,  (int)mdCmdA);// 左前
-		MD.SpeedM2(ADR_MD2, -(int)mdCmdD);// 右前
+		MD.SpeedM1(ADR_MD1, 1500);//-(int)mdCmdB);// (int)mdCmdB);// 左後
+		MD.SpeedM2(ADR_MD1, 1500);// (int)mdCmdC);//-(int)mdCmdC);// 右後
+		MD.SpeedM1(ADR_MD2, 1500);//-(int)mdCmdA);// (int)mdCmdA);// 左前
+		MD.SpeedM2(ADR_MD2, 1500);// (int)mdCmdD);//-(int)mdCmdD);// 右前
 
 		/* static int printcount = 0;
 		printcount++;
@@ -460,31 +468,20 @@ void loop() {
 
 		
 
-		if( dataCount < 1200){//11990 ){
+		/* if( dataCount < 1200){//11990 ){
 			*(pdata1 + dataCount) = ( int )( onx * 1000 );
-			//dataCount++;
 			*(pdata2 + dataCount) = ( int )( ony * 1000 );
-			//dataCount++;
 			*(pdata3 + dataCount) = ( int )( gPosix * 1000 );
-			//dataCount++;
 			*(pdata4 + dataCount) = ( int )( gPosiy * 1000 );
 			dataCount++;
-			/* *(pdata + dataCount) = ( int )( ony * 1000 );
-			dataCount++; */
-			/* *(pdata + dataCount) = ( int )( gPosix * 1000 );
-			dataCount++;
-			*(pdata + dataCount) = ( int )( gPosiy * 1000 );
-			dataCount++; */
 		}else{
 			//dataFlag = 1;
-		}
+		} */
 
 
 
-		if( !digitalRead(PIN_SW) ){//if( dataFlag && !dataend ){
+		/* if( !digitalRead(PIN_SW) ){//if( dataFlag && !dataend ){
 			for( int forcount = 0; forcount < 1200 ; forcount++ ){
-				//Serial.print(forcount);
-				//Serial.print("\t");
 				Serial.print( *(pdata1 + forcount) );
 				Serial.print("\t");
 				Serial.print( *(pdata2 + forcount) );
@@ -496,7 +493,25 @@ void loop() {
 					dataend = true;
 				}
 			}
-		}
+		} */
+
+		Serial.print(EncountA);//xl
+		Serial.print("\t");
+		Serial.print(EncountB);//y
+		Serial.print("\t");
+		Serial.print(EncountC);//xr
+		Serial.print("\t");
+		Serial.print(gPosix, 4);
+		Serial.print("\t");
+		Serial.print(gPosiy, 4);
+		Serial.print("\t");
+		Serial.println(gPosiz, 4);
+
+		/* Serial.print(gPosix, 4);
+		Serial.print("\t");
+		Serial.print(gPosiy, 4);
+		Serial.print("\t");
+		Serial.println(gPosiz, 4); */
 
 		tenFlag = false;
 	}

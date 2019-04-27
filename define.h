@@ -4,13 +4,13 @@
 #define INT_TIME			( 0.001 )
 
 // 自己位置推定用エンコーダ関連
-#define MEASURE_HANKEI		( 0.01905 )//( 19.05 )	// エンコーダの半径
-#define MEASURE_HANKEI_X_L  ( 0.019392 )
-#define MEASURE_HANKEI_X_R  ( 0.019325 )
-#define MEASURE_HANKEI_Y    ( 0.019609 )
+#define MEASURE_HANKEI		( 0.01905 )//( 0.01905 )//( 19.05 )	// エンコーダの半径
+#define MEASURE_HANKEI_X_L  ( 0.018952 )//( 0.019392 )
+#define MEASURE_HANKEI_X_R  ( 0.019002 )//( 0.019325 )
+#define MEASURE_HANKEI_Y    ( 0.019032 )//( 0.019609 )//( 19.05 )
 
-#define MEASURE_HANKEI_D	( 0.192236 )//( 0.19 )//( 190.0 )	// 二つ平行についているエンコーダとロボットの中心の距離
-#define MEASURE_HANKEI_L	( 0.250101 )//( 0.2495 )//( 249.5 )	// 上のエンコーダに対して垂直についているエンコーダとロボットの中心の距離
+#define MEASURE_HANKEI_D	( 0.190585 )//( 0.19075 )//( 0.19 )	// 二つ平行についているエンコーダとロボットの中心の距離
+#define MEASURE_HANKEI_L	( 0.251007 )//( 0.25 )//( 0.2495 )	// 上のエンコーダに対して垂直についているエンコーダとロボットの中心の距離
 #define MEASURE_RES_MUL_X	( 800 )	// エンコーダの分解能(200)と4逓倍をかけたもの
 #define MEASURE_RES_MUL_Y	( 400 )	// エンコーダの分解能(100)と4逓倍をかけたもの
 
