@@ -33,49 +33,55 @@ Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
 // ベジエ曲線用
-double Px[22] = /* P0が頭 */
-	/* 0 */{ 0.50, 0.50, 1.515,
-	/* 1 */1.525, 1.525, 0.925, 
-	/* 2 */0.925, 0.925, 1.525, 
-	/* 3 */1.525, 1.525, 1.225, 
-	/* 4 */1.225, 1.225, 1.225, 
-	/* 5 */1.225, 1.225, 3.0, 
-	/* 6 */4.0, 5.8, 6.0, 
-	/* 7 */6.0 };
+double Px[31] = /* P0が頭 */
+	/* 0 */{ 0.500, 1.000, 1.225,
+	/* 1 */1.475, 1.725, 1.725, 
+	/* 2 */1.475, 1.225, 1.165, 
+	/* 3 */0.945, 0.725, 0.725, 
+	/* 4 */0.945, 1.045, 1.225, 
+	/* 5 */1.475, 1.725, 1.600, 
+	/* 6 */1.450, 1.300, 1.050, 
+	/* 7 */1.225, 1.400, 1.800,
+	/* 8 */2.300, 2.800, 3.500,
+	/* 9 */4.000, 5.000, 5.500,
+	/* 10 */6.050 };
 //{ 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
-double Py[22] = 
-	/* 0 */{ 0.50, 5.5/* 1.50 */, 1.00, 
-	/* 1 */2.00, 3.00, 2.50, 
-	/* 2 */3.50, 4.50, 4.00, 
-	/* 3 */5.00, 6.00, 5.75, 
-	/* 4 */6.50, 7.25, 7.50, 
-	/* 5 */8.00, 10.0, 8.30, 
-	/* 6 */8.30, 8.30, 8.30, 
-	/* 7 */8.30 };//{ 0.50, 1.25, 1.25, 2.00, 2.75, 2.75, 3.50 };
+double Py[31] = 
+	/* 0 */{ 0.500, 1.038, 1.281, 
+	/* 1 */1.550, 1.819, 2.167, 
+	/* 2 */2.450, 2.733, 2.801, 
+	/* 3 */3.050, 3.299, 3.722, 
+	/* 4 */3.950, 4.054, 4.241, 
+	/* 5 */4.500, 4.759, 5.400, 
+	/* 6 */5.800, 6.200, 7.850, 
+	/* 7 */8.200, 8.550, 8.572,
+	/* 8 */8.500, 8.427, 8.255,
+	/* 9 */8.255, 8.255, 8.255,
+	/* 10 */8.255 };
 
-double refvel[7] = {0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.2,0.2,0.2,0.2,0.2,0.2,0.2};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
+double refvel[10] = {/*A*/0.5,/*B*/0.3,/*C*/0.5,/*D*/0.3,/*E*/0.5,/*F*/0.3,/*G*/0.4,/*H*/0.3,/*I*/0.4,/*J*/0.5};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
 
 // ベジエ曲線関連
-double Ax[7];
-double Bx[7];
-double Cx[7];
-double Dx[7];
+double Ax[10];
+double Bx[10];
+double Cx[10];
+double Dx[10];
 
-double Ay[7];
-double By[7];
-double Cy[7];
-double Dy[7];
+double Ay[10];
+double By[10];
+double Cy[10];
+double Dy[10];
 
 // 内積関連
-double a_be[7];
-double b_be[7];
-double c_be[7];
-double d_be[7];
-double e_be[7];
-double f_be[7];
-double d_be_[7];
-double e_be_[7];
-double f_be_[7];
+double a_be[10];
+double b_be[10];
+double c_be[10];
+double d_be[10];
+double e_be[10];
+double f_be[10];
+double d_be_[10];
+double e_be_[10];
+double f_be_[10];
 
 double t_be = 0.0;
 double pre_t_be = 0.1;
@@ -107,7 +113,7 @@ double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosi
 
 
 // グローバル変数の設定
-double gPosix = Px[0], gPosiy = Py[0], gPosiz = 1.57080;//0;
+double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.785398;//1.5708;//0;
 
 
 // tを求めるための方程式
@@ -204,8 +210,8 @@ void timer_warikomi(){
 
 	// グローバル用(zは角度)
 	double tmp_Posiz = gPosiz + ( Posiz * 0.5 ); // つまりgPosi + ( Posiz / 2.0 );
-	gPosix += Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
-	gPosiy += Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
+	gPosix += Posix * cos( gPosiz ) - Posiy * sin( gPosiz );//Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
+	gPosiy += Posix * sin( gPosiz ) + Posiy * cos( gPosiz );//Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
 	gPosiz += Posiz;
 	
 	
@@ -303,7 +309,7 @@ void setup() {
 	yokozurePID.PIDinit(0.0, 0.0);
 	kakudoPID.PIDinit(0.0, 0.0);
 	
-	for(int i = 0; i < 7; i++) {
+	for(int i = 0; i < 10; i++) {
         Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
         Ay[i] = Py[3*i+3] -3*Py[3*i+2] + 3*Py[3*i+1] - Py[3*i+0];
         Bx[i] = Px[3*i+2] -2*Px[3*i+1] + Px[3*i+0];
@@ -314,7 +320,7 @@ void setup() {
         Dy[i] = Py[3*i+0];
     }
 
-    for(int i = 0; i < 7; i++) {
+    for(int i = 0; i < 10; i++) {
         a_be[i] = pow(Ax[i], 2.0) + pow(Ay[i], 2.0);
         b_be[i] = 5*(Ax[i]*Bx[i] + Ay[i]*By[i]);
         c_be[i] = 2*((3*pow(Bx[i],2.0)+2*Ax[i]*Cx[i]) + (3*pow(By[i],2.0)+2*Ay[i]*Cy[i]));
@@ -354,7 +360,7 @@ void loop() {
 		double onx, ony;    //ベジエ曲線上の点
 		
 		// ベジエ曲線
-		/* if( phase < 7 ){
+		if( phase < 10 ){
 			double tmpx = Px[phase*3] - gPosix;
 			double tmpy = Py[phase*3] - gPosiy;
 			
@@ -397,23 +403,25 @@ void loop() {
 			
 			double syusoku;
 			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
-			if(syusoku <= 0.05 || t_be >= 0.997){
+			if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
+				Px[3*phase+3] = gPosix;
+				Py[3*phase+3] = gPosiy;
 				phase++;
 				pre_t_be = 0.1;
 			}
 			
 			epsilon = 1.0;
-		} else { */
+		} else {
 			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-			refVxg = posiPIDx.getCmd(Px[1], gPosix, refvel[phase]);//(Px[21], gPosix, refvel[phase]);
-			refVyg = posiPIDy.getCmd(Py[1], gPosiy, refvel[phase]);//(Py[21], gPosiy, refvel[phase]);
-			refVzg = posiPIDz.getCmd(1.57080, gPosiz, refvel[phase]);
+			refVxg = posiPIDx.getCmd(Px[30], gPosix, refvel[phase]);
+			refVyg = posiPIDy.getCmd(Py[30], gPosiy, refvel[phase]);
+			refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
 
 			// 上記はグローバル座標系における速度のため，ローカルに変換
 			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
 			refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
 			refVz =  refVzg;
-		//}
+		}
 
 		// ローカル速度から，各車輪の角速度を計算
 		double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
@@ -446,10 +454,10 @@ void loop() {
 		} */
 
 		// モータにcmd?を送り，回す
-		MD.SpeedM1(ADR_MD1, 1500);//-(int)mdCmdB);// (int)mdCmdB);// 左後
-		MD.SpeedM2(ADR_MD1, 1500);// (int)mdCmdC);//-(int)mdCmdC);// 右後
-		MD.SpeedM1(ADR_MD2, 1500);//-(int)mdCmdA);// (int)mdCmdA);// 左前
-		MD.SpeedM2(ADR_MD2, 1500);// (int)mdCmdD);//-(int)mdCmdD);// 右前
+		MD.SpeedM1(ADR_MD1, -(int)mdCmdB);// (int)mdCmdB);// 左後
+		MD.SpeedM2(ADR_MD1,  (int)mdCmdC);//-(int)mdCmdC);// 右後
+		MD.SpeedM1(ADR_MD2, -(int)mdCmdA);// (int)mdCmdA);// 左前
+		MD.SpeedM2(ADR_MD2,  (int)mdCmdD);//-(int)mdCmdD);// 右前
 
 		/* static int printcount = 0;
 		printcount++;
@@ -495,11 +503,9 @@ void loop() {
 			}
 		} */
 
-		Serial.print(EncountA);//xl
+		Serial.print(onx, 4);//xl
 		Serial.print("\t");
-		Serial.print(EncountB);//y
-		Serial.print("\t");
-		Serial.print(EncountC);//xr
+		Serial.print(ony, 4);//y
 		Serial.print("\t");
 		Serial.print(gPosix, 4);
 		Serial.print("\t");
