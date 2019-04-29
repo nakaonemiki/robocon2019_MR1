@@ -59,7 +59,7 @@ double Py[31] =
 	/* 9 */8.255, 8.255, 8.255,
 	/* 10 */8.255 };
 
-double refvel[10] = {/*A*/0.5,/*B*/0.3,/*C*/0.5,/*D*/0.3,/*E*/0.5,/*F*/0.3,/*G*/0.4,/*H*/0.3,/*I*/0.4,/*J*/0.5};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
+double refvel[10] = {/*A*/0.4,/*B*/0.4,/*C*/0.4,/*D*/0.4,/*E*/0.4,/*F*/0.4,/*G*/0.4,/*H*/0.4,/*I*/0.4,/*J*/0.4};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
 
 // ベジエ曲線関連
 double Ax[10];
@@ -93,7 +93,7 @@ int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
 
-int tenCount = 9;//0;
+int tenCount = 0;//0;
 boolean tenFlag = false;
 
 int data1[ 1300 ];//[ 12000 ];
@@ -106,6 +106,10 @@ int *pdata2 = data2;
 int *pdata3 = data3;
 int *pdata4 = data4;
 
+// R1370
+int state, counter;
+byte buffer[15];
+
 /* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
 double Posix, Posiy, Posiz;
 double Posixl, Posixr;
@@ -114,7 +118,8 @@ double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosi
 
 // グローバル変数の設定
 double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.785398;//1.5708;//0;
-
+double angle_rad = gPosiz;
+const double _ANGLE_DEG = 45.0;
 
 // tを求めるための方程式
 double func(int p, double t)
@@ -168,8 +173,13 @@ void timer_warikomi(){
     static double preAngleA = 0.0, preAngleB = 0.0, preAngleC = 0.0;
     static double preVxl = 0.0, preVyl = 0.0, preVzl = 0.0;
     count++;
+
+	// R1370
+	double rawangle, diff_angle;
+	static double pre_rawangle = 0.0, angle_deg = _ANGLE_DEG;//0.0;
+	boolean recv_done = false;
 	
-	if(ledcount >= 100) {
+	if(ledcount >= 25) {
 		if(digitalRead(PIN_LED0) == LOW){
 			digitalWrite(PIN_LED0, HIGH);
 		} else {
@@ -190,12 +200,76 @@ void timer_warikomi(){
 	Kakudoxr = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;
 	Kakudoy  = ( double )( EncountB - pre_EncountB ) * _2PI_MEASRMY;
 	
+	while( !recv_done ){
+		if (Serial3.available() > 0) {
+			byte data = Serial3.read();
+			switch (state) {
+			case 0:
+				if (data == 0xaa) {
+					state++;
+				}
+				break;
+			case 1:
+				if (data == 0x00) {
+					state++;
+				} 
+				else {
+					counter = 0;
+					state = 0;
+				}
+				break;
+			case 2:
+				buffer[counter++] = data;
+				if (counter >= 13) {
+					int sum = 0;
+					for (int i = 0; i < 11; i++) sum += buffer[i];
+					if ((sum & 0xff) == buffer[12]) {
+						//Serial.print("A:");
+						rawangle = (short)(buffer[1] | (buffer[2] << 8)) / 100.0;
+						if(fabs(rawangle - pre_rawangle) >= 100){
+							if(rawangle < 0){ //+から-へ回ったとき 
+								angle_deg += 360 + rawangle - pre_rawangle;
+							}else{ // -から+へ回ったとき
+								angle_deg += -360 + rawangle -pre_rawangle;
+							}
+						}else{
+							angle_deg += rawangle - pre_rawangle;
+						}
+						// degからradに
+						angle_rad = angle_deg * ( PI / 180.0 );
+
+						pre_rawangle = rawangle;
+
+						Serial.println(angle_rad);
+						//Serial.println((buffer[2] << 8) | buffer[1]);  // angle
+						//Serial.print("\tX:");
+						//Serial.print((buffer[6] << 8) | buffer[5]);  // accX
+						//Serial.print("\tY:");
+						//Serial.print((buffer[8] << 8) | buffer[7]);  // accY
+						//Serial.print("\tZ:");
+						//Serial.println((buffer[10] << 8) | buffer[9]);  // accZ
+						//delay(10);
+						Serial3.flush();
+					}
+					state = 0;
+					counter = 0;
+					recv_done = true;
+				}
+				break;
+			}
+		}
+	}
+	recv_done = false;
+
 	// tmpKakudoy += Kakudoy;
 
 	// ローカル用(zは角度)
 	double Posix, Posiy, Posiz;
 	double Posixl, Posixr;
-	Posiz = ( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;
+	static double pre_angle_rad = angle_rad;
+	double angle_diff;
+	angle_diff = angle_rad - pre_angle_rad;
+	Posiz = angle_diff;//( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;//
 	Posix = ( MEASURE_HANKEI_X_L * Kakudoxl + MEASURE_HANKEI_X_R * Kakudoxr ) * 0.5;
 	Posixl = MEASURE_HANKEI_X_L * Kakudoxl;
 	Posixr = MEASURE_HANKEI_X_R * Kakudoxr;
@@ -214,25 +288,22 @@ void timer_warikomi(){
 	gPosiy += Posix * sin( gPosiz ) + Posiy * cos( gPosiz );//Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
 	gPosiz += Posiz;
 	
-	
-
 	tenCount++;
 
-	if( tenCount == 10 ){
+	if( tenCount == 1 ){
 		tenFlag = true;
 		tenCount = 0;
 	}
-
-	
 
 	pre_EncountA = EncountA;
 	pre_EncountB = EncountB;
 	pre_EncountC = EncountC;
 
+	pre_angle_rad = angle_rad;
+
 	// pre_tmpEncA = tmpEncA;
 	// pre_tmpEncB = tmpEncB;
 	// pre_tmpEncC = tmpEncC;
-	
 	
 	/* Serial.print( "refX:" );
 	Serial.print( "\t" );
@@ -300,6 +371,11 @@ void setup() {
 
 	// PCと通信
 	Serial.begin(115200);
+
+	// R1370
+	Serial3.begin(115200);
+	state = 0;
+	counter = 0;
 	
 	// PID関連初期化
 	posiPIDx.PIDinit(0.0, 0.0);
@@ -348,17 +424,22 @@ void setup() {
 
 void loop() {
 	static int dataCount = 0;
-	
+
 	/* if( !digitalRead(PIN_SW) ){
 		reboot_function();
 	} */
 
-	if( tenFlag ){
+	
+	
+	//while( counter < 13 ){
+	
+
+	if( tenFlag ){		
 		static int phase = 0;
 		double refVx, refVy, refVz;
-	
+
 		double onx, ony;    //ベジエ曲線上の点
-		
+
 		// ベジエ曲線
 		if( phase < 10 ){
 			double tmpx = Px[phase*3] - gPosix;
@@ -503,7 +584,7 @@ void loop() {
 			}
 		} */
 
-		Serial.print(onx, 4);//xl
+		/* Serial.print(onx, 4);//xl
 		Serial.print("\t");
 		Serial.print(ony, 4);//y
 		Serial.print("\t");
@@ -511,7 +592,7 @@ void loop() {
 		Serial.print("\t");
 		Serial.print(gPosiy, 4);
 		Serial.print("\t");
-		Serial.println(gPosiz, 4);
+		Serial.println(gPosiz, 4); */
 
 		/* Serial.print(gPosix, 4);
 		Serial.print("\t");
