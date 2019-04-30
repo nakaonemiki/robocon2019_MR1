@@ -40,7 +40,7 @@ double Px[31] = /* P0が頭 */
 	/* 3 */0.945, 0.725, 0.725, 
 	/* 4 */0.945, 1.045, 1.225, 
 	/* 5 */1.475, 1.725, 1.600, 
-	/* 6 */1.450, 1.300, 1.050, 
+	/* 6 */1.400, 1.200, 1.050, 
 	/* 7 */1.225, 1.400, 1.800,
 	/* 8 */2.300, 2.800, 3.500,
 	/* 9 */4.000, 5.000, 5.500,
@@ -54,12 +54,13 @@ double Py[31] =
 	/* 4 */3.950, 4.054, 4.241, 
 	/* 5 */4.500, 4.759, 5.400, 
 	/* 6 */5.800, 6.200, 7.850, 
-	/* 7 */8.200, 8.550, 8.572,
-	/* 8 */8.500, 8.427, 8.255,
-	/* 9 */8.255, 8.255, 8.255,
-	/* 10 */8.255 };
+	/* 7 */8.200, 8.550, 8.559,
+	/* 8 */8.500, 8.456, 8.350,
+	/* 9 */8.350, 8.350, 8.350,
+	/* 10 */8.350 };
 
-double refvel[10] = {/*A*/0.4,/*B*/0.4,/*C*/0.4,/*D*/0.4,/*E*/0.4,/*F*/0.4,/*G*/0.4,/*H*/0.4,/*I*/0.4,/*J*/0.4};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
+double refvel[10] = {/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};//{0.9,0.9,0.9,0.9,0.9,0.9,0.9};//{1.2,1.2,1.2,1.2,1.2,1.2,1.2};//
+//{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
 
 // ベジエ曲線関連
 double Ax[10];
@@ -200,7 +201,7 @@ void timer_warikomi(){
 	Kakudoxr = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;
 	Kakudoy  = ( double )( EncountB - pre_EncountB ) * _2PI_MEASRMY;
 	
-	while( !recv_done ){
+	/* while( !recv_done ){
 		if (Serial3.available() > 0) {
 			byte data = Serial3.read();
 			switch (state) {
@@ -258,7 +259,7 @@ void timer_warikomi(){
 				break;
 			}
 		}
-	}
+	} */
 	recv_done = false;
 
 	// tmpKakudoy += Kakudoy;
@@ -269,7 +270,7 @@ void timer_warikomi(){
 	static double pre_angle_rad = angle_rad;
 	double angle_diff;
 	angle_diff = angle_rad - pre_angle_rad;
-	Posiz = angle_diff;//( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;//
+	Posiz = ( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;//angle_diff;//
 	Posix = ( MEASURE_HANKEI_X_L * Kakudoxl + MEASURE_HANKEI_X_R * Kakudoxr ) * 0.5;
 	Posixl = MEASURE_HANKEI_X_L * Kakudoxl;
 	Posixr = MEASURE_HANKEI_X_R * Kakudoxr;
@@ -282,15 +283,40 @@ void timer_warikomi(){
 	tmpPosiy += Posiy;
 	tmpPosiz += Posiz;
 
-	// グローバル用(zは角度)
+	// 回転中心の座標
+	/* double Posixrc, Posiyrc;
+	double _Posix, _Posiy;
+	if( fabs(Posixr - Posixl) > 0.0001){//0.001 ){	
+		Posixrc = ( Posiy  * 2.0 * MEASURE_HANKEI_D) / ( Posixr - Posixl ) + MEASURE_HANKEI_L;
+		Posiyrc = ( Posixl * 2.0 * MEASURE_HANKEI_D) / ( Posixr - Posixl ) + MEASURE_HANKEI_D;
+	
+		// 回転中心とロボットの中心までの距離(ロー)
+		double rho = sqrt(pow(Posixrc, 2.0) + pow(Posiyrc, 2.0));
+		// Posixrc, Posiyrcを回転中心として，前の座標から今の座標までの円周
+		double deltaL = rho * Posiz;
+
+		// グローバル用(zは角度)
+		
+		//gPosix += Posix * cos( gPosiz ) - Posiy * sin( gPosiz );//Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
+		//gPosiy += Posix * sin( gPosiz ) + Posiy * cos( gPosiz );//Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
+		//gPosiz += Posiz;
+		_Posix = deltaL * Posiyrc;
+		_Posiy = deltaL * Posixrc;
+		//gPosiz += Posiz;
+	}else{
+		_Posix = Posix;
+		_Posiy = Posiy;
+	} */
+	
 	double tmp_Posiz = gPosiz + ( Posiz * 0.5 ); // つまりgPosi + ( Posiz / 2.0 );
+	gPosiz += Posiz;
 	gPosix += Posix * cos( gPosiz ) - Posiy * sin( gPosiz );//Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
 	gPosiy += Posix * sin( gPosiz ) + Posiy * cos( gPosiz );//Posix * sin( tmp_Posiz ) + Posiy * cos( tmp_Posiz );
-	gPosiz += Posiz;
-	
+	//gPosiz += Posiz;
+
 	tenCount++;
 
-	if( tenCount == 1 ){
+	if( tenCount == 10 ){
 		tenFlag = true;
 		tenCount = 0;
 	}
@@ -594,11 +620,11 @@ void loop() {
 		Serial.print("\t");
 		Serial.println(gPosiz, 4); */
 
-		/* Serial.print(gPosix, 4);
+		Serial.print(gPosix, 4);
 		Serial.print("\t");
 		Serial.print(gPosiy, 4);
 		Serial.print("\t");
-		Serial.println(gPosiz, 4); */
+		Serial.println(gPosiz, 4);
 
 		tenFlag = false;
 	}
