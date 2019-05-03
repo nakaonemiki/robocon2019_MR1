@@ -1,12 +1,12 @@
 #include "Arduino.h"
 
 // 制御周期
-#define INT_TIME			( 0.001 )//( 0.001 )
+#define INT_TIME			( 0.01 )//( 0.001 )
 
 // 自己位置推定用エンコーダ関連
 #define MEASURE_HANKEI		( 0.01905 )//( 0.01905 )//( 19.05 )	// エンコーダの半径
-#define MEASURE_HANKEI_X_L  ( 0.018952 )//( 0.019392 )
-#define MEASURE_HANKEI_X_R  ( 0.019002 )//( 0.019325 )
+#define MEASURE_HANKEI_X_R  ( 0.0188618 )//( 0.018952 )//( 0.019392 )
+#define MEASURE_HANKEI_X_L  ( 0.01900344 )//( 0.019002 )//( 0.019325 )
 #define MEASURE_HANKEI_Y    ( 0.019032 )//( 0.019609 )//( 19.05 )
 
 #define MEASURE_HANKEI_D	( 0.190585 )//( 0.19075 )//( 0.19 )	// 二つ平行についているエンコーダとロボットの中心の距離
