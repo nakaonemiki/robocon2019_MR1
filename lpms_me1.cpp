@@ -269,15 +269,19 @@ int lpms_me1::init(){
     trash = serial->read();
   }
 
-  goto_command_mode();
-  //Serial.print("goto command mode sent: ");
-  result[0] = recv_proc(1000);
-  //Serial.println(result[0]);
+  do{
+    goto_command_mode();
+    //Serial.print("goto command mode sent: ");
+    result[0] = recv_proc(500);
+    //Serial.println(result[0]);
+  }while(result[0] != 0);
   
-  set_transmit_data();
-  //Serial.print("set transmit data command sent: ");
-  result[1] = recv_proc(1000);
-  //Serial.println(result[1]);
+  do{
+    set_transmit_data();
+    //Serial.print("set transmit data command sent: ");
+    result[1] = recv_proc(500);
+    //Serial.println(result[1]);
+  }while(result[1] != 0);
 
   //set_filter_mode();
   //Serial.print("set filter mode sent: ");
@@ -285,13 +289,15 @@ int lpms_me1::init(){
   //Serial.println(result[2]);
 
   delay(10); // これがないと，データが正常に取れなくなる
-  set_offset();
-  //Serial.print("set offset sent: ");
-  result[3] = recv_proc(1000);
-  //Serial.println(result[3]);
+  do{
+    set_offset();
+    //Serial.print("set offset sent: ");
+    result[3] = recv_proc(500);
+    //Serial.println(result[3]);
+  }while(result[3] != 0);
 
   //if(result[0] >= 0 && result[1] >= 0) digitalWrite(PIN_LED3, HIGH);
   //if(result[2] >= 0 && result[3] >= 0) digitalWrite(PIN_LED2, HIGH);
 
-  return (result[0] + result[1] + result[2] + result[3]);
+  return (result[0] + result[1] + result[3]);
 }

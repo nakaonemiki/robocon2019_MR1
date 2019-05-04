@@ -49,7 +49,6 @@ double Px[31] = /* P0が頭 */
 	/* 8 */2.300, 2.800, 3.500,
 	/* 9 */4.000, 5.000, 5.500,
 	/* 10 */6.050 };
-//{ 0.50, 0.50, 1.94, 1.94, 1.94, 0.51, 0.51 };
 double Py[31] = 
 	/* 0 */{ 0.500, 1.038, 1.281, 
 	/* 1 */1.550, 1.819, 2.167, 
@@ -127,8 +126,7 @@ int *pdata7 = data7;
 
 /* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
 double Posix, Posiy, Posiz; */
-double Posixl, Posixr;
-double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
+double tmpPosix = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
 
 
 // グローバル変数の設定
@@ -198,15 +196,16 @@ void timer_warikomi(){
 	ledcount++;
 
     // 自己位置推定用エンコーダのカウント値取得
-    EncountA =  Enc1.getCount();//-Enc1.getCount();//-Enc1.getCount();	// MTU1, xl
-    EncountB =  Enc2.getCount();//-Enc2.getCount();//-Enc2.getCount();	// MTU2, y
-    EncountC = -Enc3.getCount();// Enc3.getCount();// Enc3.getCount();	// TPU1, xr
+    EncountA = -Enc1.getCount();// Enc1.getCount();//-Enc1.getCount();//-Enc1.getCount();	// MTU1, X//xl
+    EncountB =  Enc2.getCount();//-Enc2.getCount();//-Enc2.getCount();	// MTU2, //y
+    EncountC =  Enc3.getCount();//-Enc3.getCount();// Enc3.getCount();// Enc3.getCount();	// TPU1, Y//xr
 	
 	// 角度   encountはdoubleに型変換した方がいいかもしれない
-	double Kakudoxl, Kakudoxr, Kakudoy;
+	double Kakudoxl, Kakudoxr, Kakudox, Kakudoy;
 	Kakudoxl = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;//( double )( EncountA - pre_EncountA ) * _2PI_MEASRMX;
 	Kakudoxr = ( double )( EncountA - pre_EncountA ) * _2PI_MEASRMX;//( double )( EncountC - pre_EncountC ) * _2PI_MEASRMX;
-	Kakudoy  = ( double )( EncountB - pre_EncountB ) * _2PI_MEASRMY;
+	Kakudox = ( double )( EncountA - pre_EncountA ) * _2PI_MEASRMX;
+	Kakudoy = ( double )( EncountC - pre_EncountC ) * _2PI_MEASRMY;//( EncountB - pre_EncountB ) * _2PI_MEASRMY;
 
 	angle_rad = (double)lpms.get_z_angle();
 
@@ -214,20 +213,15 @@ void timer_warikomi(){
 
 	// ローカル用(zは角度)
 	double Posix, Posiy, Posiz;
-	//double Posixl, Posixr;
 	static double pre_angle_rad = angle_rad;
 	double angle_diff;
 	angle_diff = angle_rad - pre_angle_rad;
 	Posiz = angle_diff;//( MEASURE_HANKEI_X_R * Kakudoxr - MEASURE_HANKEI_X_L * Kakudoxl ) * _0P5_MEASHD;//
-	Posix = ( MEASURE_HANKEI_X_L * Kakudoxl + MEASURE_HANKEI_X_R * Kakudoxr ) * 0.5;
-	Posixl = MEASURE_HANKEI_X_L * Kakudoxl;
-	Posixr = MEASURE_HANKEI_X_R * Kakudoxr;
-	Posiy = MEASURE_HANKEI_Y * Kakudoy + MEASURE_HANKEI_L * Posiz;//MEASURE_HANKEI_Y * Kakudoy - MEASURE_HANKEI_L * Posiz;
+	Posix = MEASURE_HANKEI_X * Kakudox;//( MEASURE_HANKEI_X_L * Kakudoxl + MEASURE_HANKEI_X_R * Kakudoxr ) * 0.5;
+	Posiy = MEASURE_HANKEI_Y * Kakudoy;// + MEASURE_HANKEI_L * Posiz;//MEASURE_HANKEI_Y * Kakudoy - MEASURE_HANKEI_L * Posiz;
 	
 	//static double tmpPosix = 0.0, tmpPosixl = 0.0, tmpPosixr = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
 	tmpPosix += Posix;
-	tmpPosixl += Posixl;
-	tmpPosixr += Posixr;
 	tmpPosiy += Posiy;
 	tmpPosiz += Posiz;
 
@@ -313,7 +307,7 @@ void setup() {
 	Serial.begin(115200);
 	
 	if(lpms.init() == 0){
-		//digitalWrite(PIN_LED3, HIGH);
+		digitalWrite(PIN_LED3, HIGH);
 	}
 	//Serial.println(lpms.init());
 	
@@ -425,21 +419,22 @@ void loop() {
 			
 			double syusoku;
 			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
-			//if( phase < 9 ){
+			if( phase < 9 ){
 				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
+					digitalWrite(PIN_LED2, HIGH);
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
 					pre_t_be = 0.1;
 				}
-			//}else{// 位置制御前は早めに次のフェーズへ
-			//	if(syusoku <= 0.25 || t_be >= 0.997){
-			//		Px[3*phase+3] = gPosix;
-			//		Py[3*phase+3] = gPosiy;
-			//		phase++;
-			//		pre_t_be = 0.1;
-			//	}
-			//}
+			}else{// 位置制御前は早めに次のフェーズへ
+				if(syusoku <= 0.25 || t_be >= 0.997){
+					Px[3*phase+3] = gPosix;
+					Py[3*phase+3] = gPosiy;
+					phase++;
+					pre_t_be = 0.1;
+				}
+			}
 			
 			epsilon = 1.0;
 		} else {
@@ -492,7 +487,6 @@ void loop() {
 		MD.SpeedM1(ADR_MD2,  (int)mdCmdC);//-(int)mdCmdA);// (int)mdCmdA);// 左前
 		MD.SpeedM2(ADR_MD2, -(int)mdCmdB);// (int)mdCmdD);//-(int)mdCmdD);// 右前
 
-		digitalWrite(PIN_LED3, HIGH);
 		/* static int printcount = 0;
 		printcount++;
 		if(printcount == 10){
@@ -547,10 +541,13 @@ void loop() {
 			}
 		} */
 
-		//Serial.print(onx, 4);//xl
+		//Serial.print(onx * 1000);//xl
 		//Serial.print("\t");
-		//Serial.print(ony, 4);//y
+		//Serial.print(ony * 1000);//y
 		//Serial.print("\t");
+		/* Serial.print(gPosix * 1000);
+		Serial.print("\t");
+		Serial.println(gPosiy * 1000); */
 		/* Serial.print(EncountA);
 		Serial.print("\t");
 		Serial.print(EncountB);
@@ -561,10 +558,10 @@ void loop() {
 		Serial.print("\t");
 		Serial.println(Posixr, 3); */
 
-		/* Serial.print(gPosix);
+		/* Serial.print(Px[3], 4);
 		Serial.print("\t");
-		Serial.print(gPosiy);
-		Serial.print("\t"); */
+		Serial.println(Py[3], 4); */
+		//Serial.print("\t");
 		//Serial.println(gPosiz);
 
 		tenFlag = false;
