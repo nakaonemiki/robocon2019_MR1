@@ -79,6 +79,10 @@ double refvel[ STATE_ALL ] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_cu
 //{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
 //{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
 
+double refKakudo[ STATE_ALL ] = 
+	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0		// スラロームからゲルゲ受け渡しまで
+	/*K*/0.0,/*L*/90.0,/*M*/90.0};
+
 // ベジエ曲線関連
 double Ax[ STATE_ALL ];
 double Bx[ STATE_ALL ];
@@ -357,7 +361,7 @@ void setup() {
 	kakudoPID.PIDinit(0.0, 0.0);
 
 	sokduo_filter.setSecondOrderPara(15.0, 1.0, 0.0);
-    //kakudo_filter.setSecondOrderPara(10.0, 1.0, 0.0);
+    kakudo_filter.setSecondOrderPara(10.0, 1.0, 0.0);
 
 	for(int i = 0; i < STATE_ALL; i++) {
         Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
@@ -426,14 +430,21 @@ void loop() {
 
 	if( flag_10ms ){		
 		static int phase = 0;
+		static boolean mode = true; // true:ベジエモード，false:位置制御かRoboClaw停止モード
 		double refVx, refVy, refVz;
 
 		double onx, ony;    //ベジエ曲線上の点
 
 		double angle, dist;
 
+		double syusoku;
+
+		if(  ){ // コントローラや上半身からの指令
+			mode = true; // ベジエモードに変更
+		}
+
 		// ベジエ曲線
-		if( phase < 10 ){
+		if( mode ){//if( phase < 10 ){
 			double tmpx = Px[phase*3] - gPosix;
 			double tmpy = Py[phase*3] - gPosiy;
 			
@@ -467,18 +478,22 @@ void loop() {
 			refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
 			refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
 			//refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
-			refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
+			if( phase < ( STATE1 - 1 ) ){ // スラロームからゲルゲ受け渡しまで
+				refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
+			}else{
+				refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
+				refVrot = kakudoPID.getCmd(refKakudo, gPosiz, 1.57);
+			}
 			
 			// ローカル座標系の指令速度(グローバル座標系のも込み込み)
 			refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
 			refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
 			refVz =  refVrot;//0.628319;だと10秒で旋回？
 			
-			double syusoku;
+			//double syusoku;
 			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
 			if( phase < 9 ){
 				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
-					digitalWrite(PIN_LED2, HIGH);
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
@@ -490,10 +505,12 @@ void loop() {
 					Py[3*phase+3] = gPosiy;
 					phase++;
 					pre_t_be = 0.1;
+					mode = false; // 位置制御モードに変更
 				}
 			}
 			
 			epsilon = 1.0;
+		// 位置制御　または　停止モード
 		} else {
 			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
 			refVxg = posiPIDx.getCmd(Px[30], gPosix, refvel[phase]);
@@ -504,6 +521,16 @@ void loop() {
 			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
 			refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
 			refVz =  refVzg;
+
+			syusoku = sqrt(pow(gPosix-Px[3*phase], 2.0) + pow(gPosiy-Py[3*phase], 2.0));
+			if(syusoku <= 0.05){
+				Px[3*phase+3] = gPosix;
+				Py[3*phase+3] = gPosiy;
+				//phase++;
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+			}
 		}
 
 		// ローカル速度から，各車輪の角速度を計算
