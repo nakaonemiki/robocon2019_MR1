@@ -12,9 +12,11 @@
 #include "PIDclass.h"
 #include "Filter.h"
 #include "lpms_me1.h"
-#include "VL53L0X.h"
+//#include "VL53L0X.h"
 #include "Wire.h"
 #include "reboot.h"
+#include "SDclass.h"
+
 
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
@@ -38,10 +40,12 @@ PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
+mySDclass mySD;
+
 // VL53L0X
-const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
+/*const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
 VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
-unsigned int sensVal[SENSOR_NUM] = {0};
+unsigned int sensVal[SENSOR_NUM] = {0};*/
 
 // ベジエ曲線用
 double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
@@ -78,6 +82,10 @@ double refvel[ STATE_ALL ] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_cu
 //{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
 //{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
 //{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
+
+/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+double Px_SD[ STATE_ALL * 3 + 1 ], Py_SD[ STATE_ALL * 3 + 1 ], refvel_SD[ STATE_ALL ], refkakudo_SD[ STATE_ALL ];
+/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 // ベジエ曲線関連
 double Ax[ STATE_ALL ];
@@ -379,6 +387,18 @@ void setup() {
         f_be_[i] = 0;
     }
 
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+	Serial.print("Initializing ...");
+	//Serial.println(mySD.init());
+	mySD.init();
+	Serial.print("Path reading ...");
+	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
+	mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refkakudo_SD);
+	Serial.print("Log file making ...");
+	//Serial.println(mySD.make_logfile());
+	mySD.make_logfile();
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
@@ -559,7 +579,21 @@ void loop() {
 		//Serial.print( "\t" );
 		//Serial.println(phase);//( gPosiz, 2 );
 
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		String dataString = "";
+		static bool first_write = true;
+		if(first_write){
+			dataString += "onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
+			mySD.write_logdata(dataString);
+			first_write = false;
+			dataString = "";
+		}
+		dataString += String(onx, 4) + "," + String(ony, 4);
+		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
+		dataString += "," + String(angle, 4)  + "," + String(dist, 4);
 		
+		mySD.write_logdata(dataString);
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 		/* if( dataCount < 1200){//11990 ){
 			*(pdata1 + dataCount) = ( int )( onx * 1000 );
