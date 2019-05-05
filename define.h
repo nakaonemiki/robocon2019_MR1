@@ -4,10 +4,16 @@
 #define INT_TIME			( 0.01 )//( 0.001 )
 
 // フェーズ管理
-#define STATE1  ( 10 )// スタートからゲルゲ受け渡しまで
-#define STATE2  ( 1 )// ゲルゲ受け渡し後からシャガイ取得まで
-#define STATE3  ( 1 )// シャガイ取得後からスローイングゾーン待機まで
-#define STATE4  ( 1 )// スローイングゾーンでの走行
+#define STATE1      ( 10 )// スタートからゲルゲ受け渡しまで
+#define STATE2      ( 1 )// ゲルゲ受け渡し後からシャガイ取得まで
+#define STATE3      ( 1 )// シャガイ取得後からスローイングゾーン待機まで
+#define STATE4      ( 1 )// スローイングゾーンでの走行
+#define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
+
+// VL53L0X
+#define SENSOR_NUM  4 // 使用するセンサーの数
+#define ADDRESS_DEFALUT 0b0101001 // 0x29
+#define ADDRESS_00 (ADDRESS_DEFALUT + 2)
 
 // 自己位置推定用エンコーダ関連
 #define MEASURE_HANKEI		( 0.01905 )//( 0.01905 )//( 19.05 )	// エンコーダの半径

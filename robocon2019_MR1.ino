@@ -12,6 +12,8 @@
 #include "PIDclass.h"
 #include "Filter.h"
 #include "lpms_me1.h"
+#include "VL53L0X.h"
+#include "Wire.h"
 #include "reboot.h"
 
 // 自己位置推定用のエンコーダ
@@ -36,8 +38,13 @@ PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
+// VL53L0X
+const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
+VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
+unsigned int sensVal[SENSOR_NUM] = {0};
+
 // ベジエ曲線用
-double Px[31] = /* P0が頭 */
+double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
 	/* 0 */{ 0.500, 1.000, 1.225,
 	/* 1 */1.475, 1.725, 1.725, 
 	/* 2 */1.475, 1.225, 1.165, 
@@ -49,7 +56,7 @@ double Px[31] = /* P0が頭 */
 	/* 8 */2.300, 2.800, 3.500,
 	/* 9 */4.000, 5.000, 5.500,
 	/* 10 */6.050 };
-double Py[31] = 
+double Py[ STATE_ALL * 3 + 1 ] = //Py[31] = 
 	/* 0 */{ 0.500, 1.038, 1.281, 
 	/* 1 */1.550, 1.819, 2.167, 
 	/* 2 */2.450, 2.733, 2.801, 
@@ -66,33 +73,33 @@ const double _straight = 1.0;
 const double _curve = 1.0;
 const double _other = 1.0;
 
-double refvel[10] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other};
+double refvel[ STATE_ALL ] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other};
 //{/*A*/1.5,/*B*/1.0,/*C*/1.5,/*D*/1.0,/*E*/1.5,/*F*/1.0,/*G*/1.1,/*H*/0.8,/*I*/0.6,/*J*/0.6};
 //{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
 //{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
 //{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
 
 // ベジエ曲線関連
-double Ax[10];
-double Bx[10];
-double Cx[10];
-double Dx[10];
+double Ax[ STATE_ALL ];
+double Bx[ STATE_ALL ];
+double Cx[ STATE_ALL ];
+double Dx[ STATE_ALL ];
 
-double Ay[10];
-double By[10];
-double Cy[10];
-double Dy[10];
+double Ay[ STATE_ALL ];
+double By[ STATE_ALL ];
+double Cy[ STATE_ALL ];
+double Dy[ STATE_ALL ];
 
 // 内積関連
-double a_be[10];
-double b_be[10];
-double c_be[10];
-double d_be[10];
-double e_be[10];
-double f_be[10];
-double d_be_[10];
-double e_be_[10];
-double f_be_[10];
+double a_be[ STATE_ALL ];
+double b_be[ STATE_ALL ];
+double c_be[ STATE_ALL ];
+double d_be[ STATE_ALL ];
+double e_be[ STATE_ALL ];
+double f_be[ STATE_ALL ];
+double d_be_[ STATE_ALL ];
+double e_be_[ STATE_ALL ];
+double f_be_[ STATE_ALL ];
 
 double t_be = 0.0;
 double pre_t_be = 0.1;
@@ -104,8 +111,9 @@ int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
 
-int tenCount = 0;//0;
-boolean tenFlag = false;
+int count_10ms = 0;//0;
+boolean flag_10ms = false;
+boolean flag_20ms = false;
 boolean flag_5s = false;
 
 int data1[ 1300 ];//[ 12000 ];
@@ -264,11 +272,17 @@ void timer_warikomi(){
 		flag_5s = true;
 	}
 	if( flag_5s ){
-		tenCount++;
-		if( tenCount == 1 ){
-			tenFlag = true;
-			tenCount = 0;
+		count_10ms++;
+		if( count_10ms == 1 ){
+			flag_10ms = true;
+			count_10ms = 0;
 		}
+	}
+	static int count_20ms = 0;
+	count_20ms++;
+	if( count_20ms == 2 ){
+		flag_20ms = true;
+		count_20ms = 0;
 	}
 
 	pre_EncountA = EncountA;
@@ -304,13 +318,36 @@ void setup() {
 	MD.begin(115200);
 
 	// PCと通信
-	Serial.begin(115200);
+	Serial.begin(230400);
 	
 	if(lpms.init() == 0){
 		digitalWrite(PIN_LED3, HIGH);
 	}
 	//Serial.println(lpms.init());
 	
+	// VL53L0X
+	/* Wire.begin();
+	for (int i = 0; i < SENSOR_NUM; i++){
+		pinMode(VL53L0X_GPIO[i], OUTPUT);
+		digitalWrite(VL53L0X_GPIO[i], LOW);
+	}
+
+	for (int i = 0; i < SENSOR_NUM; i++) {
+		// センサを初期化
+		pinMode(VL53L0X_GPIO[i], INPUT);
+		if (gSensor[i].init() == true){
+			gSensor[i].setTimeout(50);//(100);
+			gSensor[i].startContinuous();
+			int address = ADDRESS_00 + (i * 2);
+			gSensor[i].setAddress(address);
+			//gSensor[i].setMeasurementTimingBudget(20000);
+		}else{
+			Serial.print("Sensor ");
+			Serial.print(i);
+			Serial.println(" error");
+		}
+	} */
+
 	// PID関連初期化
 	posiPIDx.PIDinit(0.0, 0.0);
 	posiPIDy.PIDinit(0.0, 0.0);
@@ -321,8 +358,8 @@ void setup() {
 
 	sokduo_filter.setSecondOrderPara(15.0, 1.0, 0.0);
     //kakudo_filter.setSecondOrderPara(10.0, 1.0, 0.0);
-	
-	for(int i = 0; i < 10; i++) {
+
+	for(int i = 0; i < STATE_ALL; i++) {
         Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
         Ay[i] = Py[3*i+3] -3*Py[3*i+2] + 3*Py[3*i+1] - Py[3*i+0];
         Bx[i] = Px[3*i+2] -2*Px[3*i+1] + Px[3*i+0];
@@ -333,7 +370,7 @@ void setup() {
         Dy[i] = Py[3*i+0];
     }
 
-    for(int i = 0; i < 10; i++) {
+    for(int i = 0; i < STATE_ALL; i++) {
         a_be[i] = pow(Ax[i], 2.0) + pow(Ay[i], 2.0);
         b_be[i] = 5*(Ax[i]*Bx[i] + Ay[i]*By[i]);
         c_be[i] = 2*((3*pow(Bx[i],2.0)+2*Ax[i]*Cx[i]) + (3*pow(By[i],2.0)+2*Ay[i]*Cy[i]));
@@ -366,8 +403,28 @@ void loop() {
 	/* if( !digitalRead(PIN_SW) ){
 		reboot_function();
 	} */
+	if( flag_20ms ){
+		/* static int count_sens = 0;
+		sensVal[count_sens] = gSensor[count_sens].readRangeSingleMillimeters();
+		Serial.print(sensVal[count_sens]);
+		Serial.print("\t");
+		count_sens++;
+		if(count_sens == SENSOR_NUM){
+			count_sens = 0;
+			Serial.println();
+		} */
 
-	if( tenFlag ){		
+		/* for(int n = 0; n < SENSOR_NUM; n++){
+			sensVal[n] = gSensor[n].readRangeSingleMillimeters();
+			Serial.print(sensVal[n]);
+			Serial.print("\t");
+		}
+		Serial.println(); */
+	}
+
+	flag_20ms = false;
+
+	if( flag_10ms ){		
 		static int phase = 0;
 		double refVx, refVy, refVz;
 
@@ -564,6 +621,8 @@ void loop() {
 		//Serial.print("\t");
 		//Serial.println(gPosiz);
 
-		tenFlag = false;
+		
+
+		flag_10ms = false;
 	}
 }
