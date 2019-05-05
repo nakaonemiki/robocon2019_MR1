@@ -12,9 +12,11 @@
 #include "PIDclass.h"
 #include "Filter.h"
 #include "lpms_me1.h"
-#include "VL53L0X.h"
+//#include "VL53L0X.h"
 #include "Wire.h"
 #include "reboot.h"
+#include "SDclass.h"
+
 
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
@@ -38,10 +40,12 @@ PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
 
+mySDclass mySD;
+
 // VL53L0X
-const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
+/*const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
 VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
-unsigned int sensVal[SENSOR_NUM] = {0};
+unsigned int sensVal[SENSOR_NUM] = {0};*/
 
 // ベジエ曲線用
 double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
@@ -82,6 +86,10 @@ double refvel[ STATE_ALL ] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_cu
 double refKakudo[ STATE_ALL ] = 
 	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0		// スラロームからゲルゲ受け渡しまで
 	/*K*/0.0,/*L*/90.0,/*M*/90.0};
+
+/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+double Px_SD[ STATE_ALL * 3 + 1 ], Py_SD[ STATE_ALL * 3 + 1 ], refvel_SD[ STATE_ALL ], refkakudo_SD[ STATE_ALL ];
+/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 // ベジエ曲線関連
 double Ax[ STATE_ALL ];
@@ -383,6 +391,18 @@ void setup() {
         f_be_[i] = 0;
     }
 
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+	Serial.print("Initializing ...");
+	//Serial.println(mySD.init());
+	mySD.init();
+	Serial.print("Path reading ...");
+	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
+	mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refkakudo_SD);
+	Serial.print("Log file making ...");
+	//Serial.println(mySD.make_logfile());
+	mySD.make_logfile();
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
@@ -586,7 +606,21 @@ void loop() {
 		//Serial.print( "\t" );
 		//Serial.println(phase);//( gPosiz, 2 );
 
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		String dataString = "";
+		static bool first_write = true;
+		if(first_write){
+			dataString += "onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
+			mySD.write_logdata(dataString);
+			first_write = false;
+			dataString = "";
+		}
+		dataString += String(onx, 4) + "," + String(ony, 4);
+		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
+		dataString += "," + String(angle, 4)  + "," + String(dist, 4);
 		
+		mySD.write_logdata(dataString);
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 		/* if( dataCount < 1200){//11990 ){
 			*(pdata1 + dataCount) = ( int )( onx * 1000 );
