@@ -29,9 +29,9 @@ RoboClaw MD(&Serial2,1);//10);
 // lpms-me1
 lpms_me1 lpms(&Serial3);
 
-PID posiPIDx(7.0, 0.0, 0.0, INT_TIME);
-PID posiPIDy(6.0, 0.0, 0.0, INT_TIME);
-PID posiPIDz(9.0, 0.0, 0.0, INT_TIME);
+PID posiPIDx(5.0, 0.0, 0.0, INT_TIME);
+PID posiPIDy(4.0, 0.0, 0.0, INT_TIME);
+PID posiPIDz(5.0, 0.0, 0.0, INT_TIME);
 
 PID yokozurePID(3.0, 0.0, 0.0, INT_TIME);
 PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
@@ -59,7 +59,10 @@ double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
 	/* 7 */1.225, 1.400, 1.800,
 	/* 8 */2.300, 2.800, 3.500,
 	/* 9 */4.000, 5.000, 5.500,
-	/* 10 */6.050 };
+	/* 10 */6.075, 5.575, 5.050,
+	/* 11 */5.000, 4.300, 3.700,
+	/* 12 */3.700, 3.700, 3.700, 
+	/* 13 */3.700 };
 double Py[ STATE_ALL * 3 + 1 ] = //Py[31] = 
 	/* 0 */{ 0.500, 1.038, 1.281, 
 	/* 1 */1.550, 1.819, 2.167, 
@@ -71,21 +74,27 @@ double Py[ STATE_ALL * 3 + 1 ] = //Py[31] =
 	/* 7 */8.200, 8.550, 8.574,
 	/* 8 */8.500, 8.426, 8.250,
 	/* 9 */8.250, 8.250, 8.250,
-	/* 10 */8.250 };
+	/* 10 */8.275, 8.275, 8.400,
+	/* 11 */9.000, 9.000, 8.950, 
+	/* 12 */8.350, 7.750, 5.400,
+	/* 13 */4.400 };
 
 const double _straight = 1.0;
 const double _curve = 1.0;
 const double _other = 1.0;
+const double _test = 0.3;
 
-double refvel[ STATE_ALL ] = {/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other};
+double refvel[ STATE_ALL ] = 
+	{/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other,
+	/*K*/_test,/*L*/_test,/*M*/_test};
 //{/*A*/1.5,/*B*/1.0,/*C*/1.5,/*D*/1.0,/*E*/1.5,/*F*/1.0,/*G*/1.1,/*H*/0.8,/*I*/0.6,/*J*/0.6};
 //{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
 //{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
 //{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
 
-double refKakudo[ STATE_ALL ] = 
-	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0		// スラロームからゲルゲ受け渡しまで
-	/*K*/0.0,/*L*/90.0,/*M*/90.0};
+double refangle[ STATE_ALL ] = 
+	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0,		// スラロームからゲルゲ受け渡しまで
+	/*K*/0.0,/*L*/1.5708,/*M*/1.5708};
 
 /*** SDカード利用のためにちゅいか　2019/05/05 ***/
 double Px_SD[ STATE_ALL * 3 + 1 ], Py_SD[ STATE_ALL * 3 + 1 ], refvel_SD[ STATE_ALL ], refkakudo_SD[ STATE_ALL ];
@@ -325,6 +334,7 @@ void setup() {
     pinMode(PIN_LED1, OUTPUT);
 	pinMode(PIN_LED2, OUTPUT);
     pinMode(PIN_LED3, OUTPUT);
+	pinMode(A0, INPUT);
 
 	// RoboClaw
 	MD.begin(115200);
@@ -369,7 +379,7 @@ void setup() {
 	kakudoPID.PIDinit(0.0, 0.0);
 
 	sokduo_filter.setSecondOrderPara(15.0, 1.0, 0.0);
-    kakudo_filter.setSecondOrderPara(10.0, 1.0, 0.0);
+    kakudo_filter.setSecondOrderPara(7.0, 1.0, 0.0);
 
 	for(int i = 0; i < STATE_ALL; i++) {
         Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
@@ -397,8 +407,8 @@ void setup() {
 	mySD.init();
 	Serial.print("Path reading ...");
 	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
-	mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refkakudo_SD);
-	Serial.print("Log file making ...");
+	//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
+	//Serial.print("Log file making ...");
 	//Serial.println(mySD.make_logfile());
 	mySD.make_logfile();
 	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
@@ -424,6 +434,7 @@ void setup() {
 void loop() {
 	static int dataCount = 0;
 
+	double refKakudo;
 	/* if( !digitalRead(PIN_SW) ){
 		reboot_function();
 	} */
@@ -458,10 +469,6 @@ void loop() {
 		double angle, dist;
 
 		double syusoku;
-
-		if(  ){ // コントローラや上半身からの指令
-			mode = true; // ベジエモードに変更
-		}
 
 		// ベジエ曲線
 		if( mode ){//if( phase < 10 ){
@@ -520,7 +527,7 @@ void loop() {
 					pre_t_be = 0.1;
 				}
 			}else{// 位置制御前は早めに次のフェーズへ
-				if(syusoku <= 0.25 || t_be >= 0.997){
+				if(syusoku <= 0.3 || t_be >= 0.997){//(syusoku <= 0.25 || t_be >= 0.997){
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
@@ -532,10 +539,11 @@ void loop() {
 			epsilon = 1.0;
 		// 位置制御　または　停止モード
 		} else {
+			digitalWrite(PIN_LED2, HIGH);
 			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-			refVxg = posiPIDx.getCmd(Px[30], gPosix, refvel[phase]);
-			refVyg = posiPIDy.getCmd(Py[30], gPosiy, refvel[phase]);
-			refVzg = posiPIDz.getCmd(0.0, gPosiz, refvel[phase]);
+			refVxg = posiPIDx.getCmd(Px[3*phase], gPosix, refvel[phase]);//(Px[30], gPosix, refvel[phase]);
+			refVyg = posiPIDy.getCmd(Py[3*phase], gPosiy, refvel[phase]);//(Py[30], gPosiy, refvel[phase]);
+			refVzg = posiPIDz.getCmd(refangle[phase], gPosiz, refvel[phase]);//(0.0, gPosiz, refvel[phase]);
 
 			// 上記はグローバル座標系における速度のため，ローカルに変換
 			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
@@ -544,12 +552,17 @@ void loop() {
 
 			syusoku = sqrt(pow(gPosix-Px[3*phase], 2.0) + pow(gPosiy-Py[3*phase], 2.0));
 			if(syusoku <= 0.05){
-				Px[3*phase+3] = gPosix;
-				Py[3*phase+3] = gPosiy;
+				digitalWrite(PIN_LED1, HIGH);
+				//Px[3*phase+3] = gPosix;
+				//Py[3*phase+3] = gPosiy;
 				//phase++;
 				refVx = 0.0;
 				refVy = 0.0;
 				refVz = 0.0;
+
+				if( !digitalRead(A0) ){ // コントローラや上半身からの指令
+					mode = true; // ベジエモードに変更
+				}
 			}
 		}
 
@@ -617,7 +630,7 @@ void loop() {
 		}
 		dataString += String(onx, 4) + "," + String(ony, 4);
 		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
-		dataString += "," + String(angle, 4)  + "," + String(dist, 4);
+		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4);
 		
 		mySD.write_logdata(dataString);
 		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
@@ -681,8 +694,6 @@ void loop() {
 		Serial.println(Py[3], 4); */
 		//Serial.print("\t");
 		//Serial.println(gPosiz);
-
-		
 
 		flag_10ms = false;
 	}
