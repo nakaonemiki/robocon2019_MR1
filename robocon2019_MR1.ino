@@ -36,6 +36,8 @@ PID posiPIDz(5.0, 0.0, 0.0, INT_TIME);
 PID yokozurePID(3.0, 0.0, 0.0, INT_TIME);
 PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 
+boolean pidPreError_update = false;
+
 // 二次遅れ使えるようになる
 Filter sokduo_filter(INT_TIME);
 Filter kakudo_filter(INT_TIME);
@@ -162,7 +164,7 @@ double tmpPosix = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
 
 
 // グローバル変数の設定
-double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.785398;//1.5708;//0;
+double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.0;//0.785398;//1.5708;//0;
 double angle_rad = gPosiz;
 const double _ANGLE_DEG = 45.0;
 
@@ -475,6 +477,8 @@ void loop() {
 
 		// ベジエ曲線
 		if( mode ){//if( phase < 10 ){
+			pidPreError_update = false; // 位置制御モードになったら最初だけpreErrorを現在の値で作成
+
 			double tmpx = Px[phase*3] - gPosix;
 			double tmpy = Py[phase*3] - gPosiy;
 			
@@ -542,7 +546,14 @@ void loop() {
 			epsilon = 1.0;
 		// 位置制御　または　停止モード
 		} else {
-			digitalWrite(PIN_LED2, HIGH);
+			// PIDのpreError更新(最初のみ)
+			if( !pidPreError_update ){
+				posiPIDx.PIDinit(Px[3*phase], gPosix);	// ref, act
+				posiPIDy.PIDinit(Py[3*phase], gPosiy);
+				posiPIDz.PIDinit(refangle[phase], gPosiz);
+				pidPreError_update = true; // ベジエモードに入ったらfalseになる．
+			}
+
 			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
 			refVxg = posiPIDx.getCmd(Px[3*phase], gPosix, refvel[phase]);//(Px[30], gPosix, refvel[phase]);
 			refVyg = posiPIDy.getCmd(Py[3*phase], gPosiy, refvel[phase]);//(Py[30], gPosiy, refvel[phase]);
@@ -555,7 +566,6 @@ void loop() {
 
 			syusoku = sqrt(pow(gPosix-Px[3*phase], 2.0) + pow(gPosiy-Py[3*phase], 2.0));
 			if(syusoku <= 0.05){
-				digitalWrite(PIN_LED1, HIGH);
 				//Px[3*phase+3] = gPosix;
 				//Py[3*phase+3] = gPosiy;
 				//phase++;
@@ -692,11 +702,11 @@ void loop() {
 		Serial.print("\t");
 		Serial.println(Posixr, 3); */
 
-		/* Serial.print(Px[3], 4);
+		Serial.print(gPosix, 4);
 		Serial.print("\t");
-		Serial.println(Py[3], 4); */
-		//Serial.print("\t");
-		//Serial.println(gPosiz);
+		Serial.print(gPosiy, 4);
+		Serial.print("\t");
+		Serial.println(gPosiz, 4);
 
 		flag_10ms = false;
 	}
