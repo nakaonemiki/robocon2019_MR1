@@ -270,7 +270,6 @@ void timer_warikomi(){
 		double rho = sqrt(pow(Posixrc, 2.0) + pow(Posiyrc, 2.0));
 		// Posixrc, Posiyrcを回転中心として，前の座標から今の座標までの円周
 		double deltaL = rho * Posiz;
-
 		// グローバル用(zは角度)
 		
 		//gPosix += Posix * cos( gPosiz ) - Posiy * sin( gPosiz );//Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
@@ -358,7 +357,6 @@ void setup() {
 		pinMode(VL53L0X_GPIO[i], OUTPUT);
 		digitalWrite(VL53L0X_GPIO[i], LOW);
 	}
-
 	for (int i = 0; i < SENSOR_NUM; i++) {
 		// センサを初期化
 		pinMode(VL53L0X_GPIO[i], INPUT);
@@ -612,10 +610,10 @@ void loop() {
 		
 
 		// モータにcmd?を送り，回す
-		MD.SpeedM1(ADR_MD1,  (int)mdCmdD);//-(int)mdCmdB);// (int)mdCmdB);// 左後
-		MD.SpeedM2(ADR_MD1, -(int)mdCmdA);// (int)mdCmdC);//-(int)mdCmdC);// 右後
-		MD.SpeedM1(ADR_MD2,  (int)mdCmdC);//-(int)mdCmdA);// (int)mdCmdA);// 左前
-		MD.SpeedM2(ADR_MD2, -(int)mdCmdB);// (int)mdCmdD);//-(int)mdCmdD);// 右前
+		MD.SpeedM1(ADR_MD1, -(int)mdCmdD);//-(int)mdCmdB);// (int)mdCmdB);// 左後
+		MD.SpeedM2(ADR_MD1,  (int)mdCmdA);// (int)mdCmdC);//-(int)mdCmdC);// 右後
+		MD.SpeedM1(ADR_MD2, -(int)mdCmdC);//-(int)mdCmdA);// (int)mdCmdA);// 左前
+		MD.SpeedM2(ADR_MD2,  (int)mdCmdB);// (int)mdCmdD);//-(int)mdCmdD);// 右前
 
 		/* static int printcount = 0;
 		printcount++;
