@@ -70,8 +70,11 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   char *pathFile;
   char *velFile;
   char tmpchar;
-  String tmpA = "", tmpB = "";
+  //String tmpA = "",
+  char tmpA[10]; 
+  String tmpB = "";
   bool file_end  = false;
+  int i = 0;
 
   // 赤か青かで読み込むファイルを変更する
   if(field == RED){
@@ -90,11 +93,12 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
     // read from the file until there's nothing else in it:
     while (!file_end && myFile.available()) {
       while((tmpchar = myFile.read()) != ','){
-        tmpA += tmpchar;
+        tmpA[i] = tmpchar;
       }
-      *Px = (double)tmpA.toFloat();
-      Serial.print(tmpA);
-      tmpA = "";
+      *Px = str2num(tmpA);//(double)tmpA.toFloat();
+      //Serial.print(tmpA);
+      Serial.print(Px[i]);
+      for(i = 0; i < 10; i++) tmpA[i] = NULL;
       Px++;
       while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){
         tmpB += tmpchar;
@@ -105,7 +109,9 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
         myFile.read(); // "\n"を捨てるため
       }
       *Py = (double)tmpB.toFloat();
-      Serial.print(tmpB);
+      Serial.print(",");
+      Serial.println(tmpB);
+      //Serial.println(Py[i]);i++;
       tmpB = "";
       Py++;
     }
@@ -127,7 +133,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
         tmpA += tmpchar;
       }
       *vel = (double)tmpA.toFloat();
-      Serial.print(tmpA);
+      //Serial.print(tmpA);
       tmpA = "";
       vel++;
       while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){
@@ -139,7 +145,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
         myFile.read(); // "\n"を捨てるため
       }
       *angle = (double)tmpB.toFloat();
-      Serial.print(tmpB);
+      //Serial.print(tmpB);
       tmpB = "";
       angle++;
     }
@@ -153,4 +159,40 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   }
 
   return 0;
+}
+
+double str2num(char* str){
+  double num = 0.0;
+  bool minus = false;
+  int k = 0, keta = 0;
+  if(str[k] == '-'){
+    minus = true;
+    k++;
+  }
+  for(int i = k; i < 10; i++){
+    swtich(keta){
+    case 0:
+      (str[i] - 48);
+      keta++;
+      break;
+    case 1
+      str[i] - 48;
+      keta++;
+      break;
+    case 2
+      str[i] - 48;
+      keta++;
+      break;
+    case 3
+      str[i] - 48;
+      keta++;
+      break;
+    case 4
+      str[i] - 48;
+      keta++;
+      break;
+    case 5
+      str[i] - 48;
+      keta++;
+      break;
 }

@@ -4,10 +4,10 @@
 #define INT_TIME			( 0.01 )//( 0.001 )
 
 // フェーズ管理
-#define STATE1      ( 11 )// スタートからゲルゲ受け渡しまで
+#define STATE1      ( 12 )// スタートからゲルゲ受け渡しまで
 #define STATE2      ( 1 )// ゲルゲ受け渡し後からシャガイ取得まで
 #define STATE3      ( 1 )// シャガイ取得後からスローイングゾーン待機まで
-#define STATE4      ( 1 )// スローイングゾーンでの走行
+#define STATE4      ( 2 )// スローイングゾーンでの走行
 #define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
 
 // VL53L0X

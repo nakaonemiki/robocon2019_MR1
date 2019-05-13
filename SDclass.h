@@ -17,4 +17,6 @@ public:
     int write_logdata(String);
 
     int path_read(int, double*, double*, double*, double*);
+
+    double str2num(char*);
 };
