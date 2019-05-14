@@ -52,7 +52,7 @@ VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
 unsigned int sensVal[SENSOR_NUM] = {0};*/
 
 // ベジエ曲線用
-double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
+double Px[ 100 ] = //Px[31] = /* P0が頭 */
 	/* 0 */{ 0.500, 1.000, 1.225,
 	/* 1 */1.475, 1.725, 1.725, 
 	/* 2 */1.475, 1.225, 1.165, 
@@ -65,12 +65,12 @@ double Px[ STATE_ALL * 3 + 1 ] = //Px[31] = /* P0が頭 */
 	/* 9 */4.000, 4.400, 4.700,
 	/* 10 */5.375, 5.600, 6.005,
 	/* 11 */6.045, 6.085, 6.125,
-	/* 12 */6,135, 5.575, 5.000,
+	/* 12 *///6,135, 5.575, 5.000,
 
 	/* 13 */5.000, 4.300, 3.700,
 	/* 14 */3.700, 3.700, 3.700, 
 	/* 15 */3.700 };
-double Py[ STATE_ALL * 3 + 1 ] = //Py[31] = 
+double Py[ 100 ] = //Py[31] = 
 	/* 0 */{ 0.500, 1.038, 1.281, 
 	/* 1 */1.550, 1.819, 2.167, 
 	/* 2 */2.450, 2.733, 2.801, 
@@ -83,7 +83,7 @@ double Py[ STATE_ALL * 3 + 1 ] = //Py[31] =
 	/* 9 */8.275, 8.275, 8.275,
 	/* 10 */8.275, 8.275, 8.295,
 	/* 11 */8.255, 8.215, 8.175,
-	/* 12 */8.175, 8.345, 8.500,
+	/* 12 *///8.175, 8.345, 8.500,
 
 	/* 13 */9.000, 8.900, 8.750, 
 	/* 14 */8.350, 7.950, 5.400,
@@ -91,21 +91,21 @@ double Py[ STATE_ALL * 3 + 1 ] = //Py[31] =
 
 const double _straight = 0.5;//1.0;
 const double _curve = 0.5;//1.0;
-const double _other = 1.0;
+const double _other = 0.5;//1.0;
 const double _slow = 0.5;
 const double _jiwajiwa = 0.15;
 const double _test = 0.3;
 
-double refvel[ STATE_ALL ] = 
-	{/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other,/*K*/_slow,/*L*/_jiwajiwa,
+double refvel[ 50 ] = 
+	{/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other,/*K*/_slow,/*L*/
 	/*M*/_test,/*N*/_test,/*O*/_test};
 //{/*A*/1.5,/*B*/1.0,/*C*/1.5,/*D*/1.0,/*E*/1.5,/*F*/1.0,/*G*/1.1,/*H*/0.8,/*I*/0.6,/*J*/0.6};
 //{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
 //{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
 //{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
 
-double refangle[ STATE_ALL ] = 
-	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0,/*K*/0.0,/*L*/0.0,		// スラロームからゲルゲ受け渡しまで
+double refangle[ 50 ] = 
+	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0,/*K*/0.0,/*L*/		// スラロームからゲルゲ受け渡しまで
 	/*M*/1.5708,/*N*/1.5708,/*O*/1.74533};
 
 /*** SDカード利用のためにちゅいか　2019/05/05 ***/
@@ -143,6 +143,7 @@ int EncountA = 0, EncountB = 0, EncountC = 0;
 int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
+boolean flag_jiwajiwa = false;
 
 int count_10ms = 0;//0;
 boolean flag_10ms = false;
@@ -165,7 +166,7 @@ int *pdata5 = data5;
 int *pdata6 = data6;
 int *pdata7 = data7;
 
-byte swState = 0b00000000;
+byte swState = 0b00000000;	// 一番頭はflag代わりに使用
 
 /* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
 double Posix, Posiy, Posiz; */
@@ -173,7 +174,7 @@ double tmpPosix = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
 
 
 // グローバル変数の設定
-double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.0;//0.785398;//1.5708;//0;
+double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.785398;//1.5708;//0;
 double angle_rad = gPosiz;
 const double _ANGLE_DEG = 45.0;
 
@@ -337,6 +338,7 @@ void timer_warikomi(){
 	Serial.print( gPosiy, 2 );
 	Serial.print( "\t" );
 	Serial.println(phase);//( gPosiz, 2 );*/
+	
 }
 
 
@@ -407,6 +409,32 @@ void setup() {
 	sokduo_filter.setSecondOrderPara(15.0, 1.0, 0.0);
     kakudo_filter.setSecondOrderPara(7.0, 1.0, 0.0);
 
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+	Serial.print("Initializing ...");
+	//Serial.println(mySD.init());
+	mySD.init();
+	Serial.print("Path reading ...");
+	
+	while( digitalRead(49) && digitalRead(50) );
+
+	if( !digitalRead(51) ){	// 赤
+		digitalWrite(PIN_RED, HIGH);
+		Serial.println(mySD.path_read(RED, Px, Py, refvel, refangle));
+		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
+	}else{					// 青
+		digitalWrite(PIN_BLUE, HIGH);
+		Serial.println(mySD.path_read(BLUE, Px, Py, refvel, refangle));
+		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
+	}
+
+	Serial.println(Px[0]);
+	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
+	//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
+	//Serial.print("Log file making ...");
+	//Serial.println(mySD.make_logfile());
+	mySD.make_logfile();
+	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+
 	for(int i = 0; i < STATE_ALL; i++) {
         Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
         Ay[i] = Py[3*i+3] -3*Py[3*i+2] + 3*Py[3*i+1] - Py[3*i+0];
@@ -426,31 +454,6 @@ void setup() {
         e_be_[i] = 3*pow(Cx[i],2.0) + 3*pow(Cy[i],2.0);
         f_be_[i] = 0;
     }
-
-	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
-	Serial.print("Initializing ...");
-	//Serial.println(mySD.init());
-	mySD.init();
-	Serial.print("Path reading ...");
-	
-	while( digitalRead(49) && digitalRead(50) );
-
-	if( !digitalRead(51) ){	// 赤
-		digitalWrite(PIN_RED, HIGH);
-		Serial.println(mySD.path_read(RED, Px, Py, refvel, refangle));
-		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
-	}else{					// 青
-		digitalWrite(PIN_BLUE, HIGH);
-		Serial.println(mySD.path_read(BLUE, Px, Py, refvel, refangle));
-		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
-	}
-
-	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
-	//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
-	//Serial.print("Log file making ...");
-	//Serial.println(mySD.make_logfile());
-	mySD.make_logfile();
-	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
@@ -474,6 +477,17 @@ void loop() {
 	static int dataCount = 0;
 
 	double refKakudo;
+
+
+	static int phase = 0;
+		static boolean mode = true; // true:ベジエモード，false:位置制御かRoboClaw停止モード
+		double refVx, refVy, refVz;
+
+		double onx, ony;    //ベジエ曲線上の点
+
+		double angle, dist;
+
+		double syusoku;
 	/* if( !digitalRead(PIN_SW) ){
 		reboot_function();
 	} */
@@ -494,12 +508,27 @@ void loop() {
 			Serial.print("\t");
 		}
 		Serial.println(); */
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		String dataString = "";
+		static bool first_write = true;
+		if(first_write){
+			dataString += "phase,onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
+			mySD.write_logdata(dataString);
+			first_write = false;
+			dataString = "";
+		}
+		dataString += String(phase) + "," + String(onx, 4) + "," + String(ony, 4);
+		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
+		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4) + "," + String(syusoku, 4) + "," + String(t_be, 4);
+		
+		mySD.write_logdata(dataString);
+		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 	}
 
 	flag_20ms = false;
 
 	if( flag_10ms ){		
-		static int phase = 0;
+		/* static int phase = 0;
 		static boolean mode = true; // true:ベジエモード，false:位置制御かRoboClaw停止モード
 		double refVx, refVy, refVz;
 
@@ -507,28 +536,44 @@ void loop() {
 
 		double angle, dist;
 
-		double syusoku;
+		double syusoku; */
 
-		if( digitalRead(A0) ) swState |= 0b00000001;	// 青用
-		if( digitalRead(A1) ) swState |= 0b00000010;	// 青用
-		if( digitalRead(A2) ) swState |= 0b00000100;	// 前
-		if( digitalRead(A3) ) swState |= 0b00001000;	// 前
-		if( digitalRead(A4) ) swState |= 0b00010000;	// 赤用
-		if( digitalRead(A5) ) swState |= 0b00100000;	// 赤用
+		if( !digitalRead(A0) ) swState |= 0b00000001;	// 青用
+		if( !digitalRead(A1) ) swState |= 0b00000010;	// 青用
+		if( !digitalRead(A2) ) swState |= 0b00000100;	// 前
+		if( !digitalRead(A3) ) swState |= 0b00001000;	// 前
+		if( !digitalRead(A4) ) swState |= 0b00010000;	// 赤用
+		if( !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
 
-		if( swState == 0b00111100/*赤*/ || 0b00001111/*青*/ ){
+		if( swState == 0b00111100/*赤*/ || swState == 0b00001111/*青*/ ){
 			gPosix = 6.058;
 			gPosiy = 8.245;
 			gPosiz = 0.0;
 
-			//Px[3*phase+3] = gPosix;
-			//Py[3*phase+3] = gPosiy;
+			Px[3*phase+3] = gPosix;
+			Py[3*phase+3] = gPosiy;
 			phase++;
 			pre_t_be = 0.1;
+
+			flag_jiwajiwa = false;
+			swState |= 0b10000000; // このif文に何度も入らないように，一番最初の数字をflagとして使用
+			//digitalWrite(PIN_LED1, HIGH);
+		}
+		if(phase == 11){
+			digitalWrite(PIN_LED1, HIGH);
 		}
 
 		// ベジエ曲線
 		if( mode ){//if( phase < 10 ){
+			static int kari = 0;
+		if( kari < 51 ){
+			Serial.print(kari);
+			Serial.print("\t");
+			Serial.print(Px[kari]);
+			Serial.print("\t");
+			Serial.println(Py[kari]);
+			kari++;
+		}
 			pidPreError_update = false; // 位置制御モードになったら最初だけpreErrorを現在の値で作成
 
 			double tmpx = Px[phase*3] - gPosix;
@@ -564,9 +609,10 @@ void loop() {
 			refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
 			refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
 			//refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
-			if( phase < STATE1 ){ // スラロームからゲルゲ受け渡しまで
+			if( phase < ( STATE1 - 1) ){ // スラロームからゲルゲ受け渡しまで
 				refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
 			}else{
+				//digitalWrite(PIN_LED2, HIGH);
 				refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
 				refVrot = kakudoPID.getCmd(refKakudo, gPosiz, 1.57);
 			}
@@ -580,20 +626,26 @@ void loop() {
 			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
 			if( phase < STATE1 ){
 				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
+					//digitalWrite(PIN_LED1, HIGH);
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
 					pre_t_be = 0.1;
 				}
-			}else if( phase == ( STATE_ALL - 2 ) ){
+			}else if( phase == STATE1 ){
+				if(syusoku <= 0.02 || t_be >= 0.997){
+					flag_jiwajiwa = true;
+				}
+			/* }else if( phase == ( STATE_ALL - 2 ) ){
 				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
 					pre_t_be = 0.1;
-				}
+				} */
 			}else{// 位置制御前は早めに次のフェーズへ
 				if(syusoku <= 0.3 || t_be >= 0.997){//(syusoku <= 0.25 || t_be >= 0.997){
+					//digitalWrite(PIN_LED2, HIGH);
 					Px[3*phase+3] = gPosix;
 					Py[3*phase+3] = gPosiy;
 					phase++;
@@ -605,6 +657,7 @@ void loop() {
 			epsilon = 1.0;
 		// 位置制御　または　停止モード
 		} else {
+			//digitalWrite(PIN_LED1, HIGH);
 			// PIDのpreError更新(最初のみ)
 			if( !pidPreError_update ){
 				posiPIDx.PIDinit(Px[3*phase], gPosix);	// ref, act
@@ -632,10 +685,22 @@ void loop() {
 				refVy = 0.0;
 				refVz = 0.0;
 
-				if( !digitalRead(A0) ){ // コントローラや上半身からの指令
+				/* if( !digitalRead(A0) ){ // コントローラや上半身からの指令
 					mode = true; // ベジエモードに変更
-				}
+				} */
 			}
+		}
+
+		if( phase == STATE1 && flag_jiwajiwa ){
+			refVx =  0.15;
+			refVy = -0.15;
+
+			if( !digitalRead(A0) && !digitalRead(A1) ) refVy = 0.0;	// 青用
+			if( !digitalRead(A2) && !digitalRead(A3) ) refVx = 0.0;// 前
+			//if( !digitalRead(A4) || !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
+
+			
+			refVz =  0.0;
 		}
 
 		// ローカル速度から，各車輪の角速度を計算
@@ -692,19 +757,19 @@ void loop() {
 		//Serial.println(phase);//( gPosiz, 2 );
 
 		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
-		String dataString = "";
+		/* String dataString = "";
 		static bool first_write = true;
 		if(first_write){
-			dataString += "onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
+			dataString += "phase,onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
 			mySD.write_logdata(dataString);
 			first_write = false;
 			dataString = "";
 		}
-		dataString += String(onx, 4) + "," + String(ony, 4);
+		dataString += String(phase) + "," + String(onx, 4) + "," + String(ony, 4);
 		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
-		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4);
+		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4) + "," + String(syusoku, 4) + "," + String(t_be, 4);
 		
-		mySD.write_logdata(dataString);
+		mySD.write_logdata(dataString); */
 		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
 
 		/* if( dataCount < 1200){//11990 ){
@@ -767,15 +832,7 @@ void loop() {
 		Serial.print("\t");
 		Serial.println(gPosiz, 4); */
 
-		static int kari = 0;
-		if( kari < 51 ){
-			Serial.print(kari);
-			Serial.print("\t");
-			Serial.print(Px[kari]);
-			Serial.print("\t");
-			Serial.println(Py[kari]);
-			kari++;
-		}
+		
 		/* Serial.print();
 		Serial.print();
 		Serial.print();

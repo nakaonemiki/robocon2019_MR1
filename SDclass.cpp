@@ -96,7 +96,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
       }
       *Px = str2double(tmpA, numx); //関数でdoubleに変換
       //Serial.print(tmpA);
-      //Serial.print(*Px);
+      Serial.print(*Px);
       for(int i = 0; i < 10; i++) tmpA[i] = 0; // 文字列を初期化
       numx=0;
       Px++;
@@ -110,8 +110,8 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
         myFile.read(); // "\n"を捨てるため
       }
       *Py = str2double(tmpB, numy); //関数でdoubleに変換
-      //Serial.print(",");
-      //Serial.println(*Py);
+      Serial.print(",");
+      Serial.println(*Py);
       //Serial.println(tmpB);
       for(int i = 0; i < 10; i++) tmpB[i] = 0;
       numy = 0;
@@ -119,7 +119,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
     }
     //Serial.print("path done! ");
     file_end = false;
-    // close the file:
+    //   the file:
      myFile.close();
   } else {
   	// if the file didn't open, print an error:
@@ -137,7 +137,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
       }
       *vel = str2double(tmpC, numv); //関数でdoubleに変換
       //Serial.print(tmpA);
-      //Serial.print(*vel);
+      Serial.print(*vel);
       for(int i = 0; i < 10; i++) tmpC[i] = 0;
       numv = 0;
       vel++;
@@ -152,8 +152,8 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
       }
       *angle = str2double(tmpD, numa); //関数でdoubleに変換
       //Serial.print(tmpB);
-      //Serial.print(",");
-      //Serial.println(*angle);
+      Serial.print(",");
+      Serial.println(*angle);
       for(int i = 0; i < 10; i++) tmpD[i] = 0;
       numa = 0;
       angle++;
