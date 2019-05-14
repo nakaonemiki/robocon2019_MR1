@@ -18,5 +18,5 @@ public:
 
     int path_read(int, double*, double*, double*, double*);
 
-    double str2num(char*);
+    double str2double(char*, int);
 };

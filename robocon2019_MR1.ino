@@ -370,6 +370,7 @@ void setup() {
 	if(lpms.init() == 0){
 		digitalWrite(PIN_LED3, HIGH);
 	}
+
 	//Serial.println(lpms.init());
 	
 	// VL53L0X
@@ -520,8 +521,8 @@ void loop() {
 			gPosiy = 8.245;
 			gPosiz = 0.0;
 
-			Px[3*phase+3] = gPosix;
-			Py[3*phase+3] = gPosiy;
+			//Px[3*phase+3] = gPosix;
+			//Py[3*phase+3] = gPosiy;
 			phase++;
 			pre_t_be = 0.1;
 		}

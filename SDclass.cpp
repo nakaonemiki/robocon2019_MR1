@@ -70,11 +70,9 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   char *pathFile;
   char *velFile;
   char tmpchar;
-  //String tmpA = "",
-  char tmpA[10]; 
-  String tmpB = "";
+  char tmpA[10], tmpB[10], tmpC[10], tmpD[10];
   bool file_end  = false;
-  int i = 0;
+  int numx = 0, numy = 0, numv = 0, numa = 0;
 
   // 赤か青かで読み込むファイルを変更する
   if(field == RED){
@@ -92,27 +90,31 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   if (myFile) {
     // read from the file until there's nothing else in it:
     while (!file_end && myFile.available()) {
-      while((tmpchar = myFile.read()) != ','){
-        tmpA[i] = tmpchar;
+      while((tmpchar = myFile.read()) != ','){ // カンマが来るまで繰り返し
+        tmpA[numx] = tmpchar; // 文字列に1文字ずつ格納していく
+        numx++;
       }
-      *Px = str2num(tmpA);//(double)tmpA.toFloat();
+      *Px = str2double(tmpA, numx); //関数でdoubleに変換
       //Serial.print(tmpA);
-      Serial.print(Px[i]);
-      for(i = 0; i < 10; i++) tmpA[i] = NULL;
+      //Serial.print(*Px);
+      for(int i = 0; i < 10; i++) tmpA[i] = 0; // 文字列を初期化
+      numx=0;
       Px++;
-      while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){
-        tmpB += tmpchar;
+      while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){ // 改行コードかセミコロンが来るまで繰り返し
+        tmpB[numy] = tmpchar;
+        numy++;
       }
       if(tmpchar == ';'){
         file_end = true;
       }else{
         myFile.read(); // "\n"を捨てるため
       }
-      *Py = (double)tmpB.toFloat();
-      Serial.print(",");
-      Serial.println(tmpB);
-      //Serial.println(Py[i]);i++;
-      tmpB = "";
+      *Py = str2double(tmpB, numy); //関数でdoubleに変換
+      //Serial.print(",");
+      //Serial.println(*Py);
+      //Serial.println(tmpB);
+      for(int i = 0; i < 10; i++) tmpB[i] = 0;
+      numy = 0;
       Py++;
     }
     //Serial.print("path done! ");
@@ -130,23 +132,30 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   if (myFile) {
     while (!file_end && myFile.available()) {
       while((tmpchar = myFile.read()) != ','){
-        tmpA += tmpchar;
+        tmpC[numv] = tmpchar;
+        numv++;
       }
-      *vel = (double)tmpA.toFloat();
+      *vel = str2double(tmpC, numv); //関数でdoubleに変換
       //Serial.print(tmpA);
-      tmpA = "";
+      //Serial.print(*vel);
+      for(int i = 0; i < 10; i++) tmpC[i] = 0;
+      numv = 0;
       vel++;
       while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){
-        tmpB += tmpchar;
+        tmpD[numa] = tmpchar;
+        numa++;
       }
       if(tmpchar == ';'){
         file_end = true;
       }else{
         myFile.read(); // "\n"を捨てるため
       }
-      *angle = (double)tmpB.toFloat();
+      *angle = str2double(tmpD, numa); //関数でdoubleに変換
       //Serial.print(tmpB);
-      tmpB = "";
+      //Serial.print(",");
+      //Serial.println(*angle);
+      for(int i = 0; i < 10; i++) tmpD[i] = 0;
+      numa = 0;
       angle++;
     }
     //Serial.println("vel/angle done!");
@@ -161,38 +170,39 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   return 0;
 }
 
-double str2num(char* str){
-  double num = 0.0;
+double mySDclass::str2double(char* str, int num){
+  double ret = 0.0;
   bool minus = false;
-  int k = 0, keta = 0;
-  if(str[k] == '-'){
+  int m = 0, keta;
+  
+  // マイナス符号が付いているかチェック
+  if(str[0] == '-'){
     minus = true;
-    k++;
+    m++;
   }
-  for(int i = k; i < 10; i++){
-    swtich(keta){
-    case 0:
-      (str[i] - 48);
-      keta++;
-      break;
-    case 1
-      str[i] - 48;
-      keta++;
-      break;
-    case 2
-      str[i] - 48;
-      keta++;
-      break;
-    case 3
-      str[i] - 48;
-      keta++;
-      break;
-    case 4
-      str[i] - 48;
-      keta++;
-      break;
-    case 5
-      str[i] - 48;
-      keta++;
-      break;
+
+  // 何桁あるかを確認
+  keta = m;
+  while((str[keta] != '.') && (keta < num)){
+    keta++;
+  }
+  keta = keta - (m + 1);
+  
+  // 整数部を変換
+  for(int i = m; i <= (keta + m); i++){
+    if(str[i] >= 48 && str[i] <= 57){
+      ret += (double)(str[i] - 48) * pow(10.0, keta - (i - m));
+    }
+  }
+  
+  // 小数部を変換
+  int n = -1;
+  for(int i = keta + m + 2; i < num; i++ ){
+    if(str[i] >= 48 && str[i] <= 57){
+      ret += (double)(str[i] - 48) * pow(10.0, n);
+      n--;
+    }
+  }
+  if(minus) return -1.0 * ret;
+  return ret;
 }
