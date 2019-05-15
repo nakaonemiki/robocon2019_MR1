@@ -6,8 +6,8 @@
 
 #define FOLLOW_TANGENT  ( 0 )
 #define FOLLOW_COMMAND  ( 1 )
-#define FOLLOW_ICHIPID  ( 2 )
-#define POSITION_PID    ( 0 )
+//#define FOLLOW_ICHIPID  ( 2 )
+#define POSITION_PID    ( 2 )
 
 class MotionGenerator{
 public:

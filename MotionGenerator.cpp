@@ -181,7 +181,7 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
 			refVxg = posiPIDx.getCmd(Px[3 * path_num], Posix, refvel[path_num]);//(Px[30], gPosix, refvel[phase]);
 			refVyg = posiPIDy.getCmd(Py[3 * path_num], Posiy, refvel[path_num]);//(Py[30], gPosiy, refvel[phase]);
             refKakudo = kakudo_filter.SecondOrderLag(refangle[path_num]);
-			refVzg = posiPIDz.getCmd(refangle[path_num], Posiz, refvel[path_num]);//(0.0, gPosiz, refvel[phase]);
+			refVzg = posiPIDz.getCmd(refangle[path_num], Posiz, 1.57);//角速度に対してrefvelは遅すぎるから　refvel[path_num]);//(0.0, gPosiz, refvel[phase]);
 
 			// 上記はグローバル座標系における速度のため，ローカルに変換
 			refVx =  refVxg * cos(Posiz) + refVyg * sin(Posiz);
@@ -191,7 +191,13 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
 
         // 収束判定して，収束していたら　1　を返す
         dist2goal = sqrt(pow(Posix - Px[3 * path_num + 3], 2.0) + pow(Posiy - Py[3 * path_num + 3], 2.0));
-        if(dist2goal <= conv_length || t_be >= conv_tnum) return 1;
+        if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){
+            // 軌道追従制御なら，到達位置からの距離とベジエ曲線の t のどちらかの条件
+            if(dist2goal <= conv_length || t_be >= conv_tnum) return 1;
+        }if(mode == POSITION_PID){
+            // 位置制御なら，目標位置と角度両方を見る
+            if(dist2goal <= conv_length && fabs(refangle[path_num] - Posiz)) return 1;
+        }
         
         // 収束していなかったら　0　を返す
         return 0;
