@@ -16,6 +16,7 @@
 #include "Wire.h"
 #include "reboot.h"
 #include "SDclass.h"
+#include "MotionGenerator.h"
 
 #define PIN_RED		(44)
 #define PIN_BLUE	(45)
@@ -31,124 +32,62 @@ RoboClaw MD(&Serial2,1);//10);
 // lpms-me1
 lpms_me1 lpms(&Serial3);
 
-PID posiPIDx(5.0, 0.0, 0.0, INT_TIME);
-PID posiPIDy(4.0, 0.0, 0.0, INT_TIME);
-PID posiPIDz(5.0, 0.0, 0.0, INT_TIME);
-
-PID yokozurePID(3.0, 0.0, 0.0, INT_TIME);
-PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
-
 boolean pidPreError_update = false;
 
-// 二次遅れ使えるようになる
-Filter sokduo_filter(INT_TIME);
-Filter kakudo_filter(INT_TIME);
-
 mySDclass mySD;
+
+MotionGenerator motion(FOLLOW_TANGENT); // 経路追従(接線方向向く)モードで初期化
 
 // VL53L0X
 /*const int VL53L0X_GPIO[SENSOR_NUM] = {A0, A1, A2, A3};
 VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
 unsigned int sensVal[SENSOR_NUM] = {0};*/
 
-// ベジエ曲線用
-double Px[ 100 ] = //Px[31] = /* P0が頭 */
-	/* 0 */{ 0.500, 1.000, 1.225,
-	/* 1 */1.475, 1.725, 1.725, 
-	/* 2 */1.475, 1.225, 1.165, 
-	/* 3 */0.945, 0.725, 0.725, 
-	/* 4 */0.945, 1.045, 1.225, 
-	/* 5 */1.475, 1.725, 1.600, 
-	/* 6 */1.400, 1.200, 1.150, 
-	/* 7 */1.300, 1.450, 1.800,
-	/* 8 */2.300, 2.800, 3.300,
-	/* 9 */4.000, 4.400, 4.700,
-	/* 10 */5.375, 5.600, 6.005,
-	/* 11 */6.045, 6.085, 6.125,
-	/* 12 *///6,135, 5.575, 5.000,
-
-	/* 13 */5.000, 4.300, 3.700,
-	/* 14 */3.700, 3.700, 3.700, 
-	/* 15 */3.700 };
-double Py[ 100 ] = //Py[31] = 
-	/* 0 */{ 0.500, 1.038, 1.281, 
-	/* 1 */1.550, 1.819, 2.167, 
-	/* 2 */2.450, 2.733, 2.801, 
-	/* 3 */3.050, 3.299, 3.722, 
-	/* 4 */3.950, 4.054, 4.241, 
-	/* 5 */4.500, 4.759, 5.400, 
-	/* 6 */5.800, 6.200, 7.850, 
-	/* 7 */8.200, 8.550, 8.550,
-	/* 8 */8.450, 8.350, 8.275,
-	/* 9 */8.275, 8.275, 8.275,
-	/* 10 */8.275, 8.275, 8.295,
-	/* 11 */8.255, 8.215, 8.175,
-	/* 12 *///8.175, 8.345, 8.500,
-
-	/* 13 */9.000, 8.900, 8.750, 
-	/* 14 */8.350, 7.950, 5.400,
-	/* 15 */4.400 };
-
-const double _straight = 0.5;//1.0;
-const double _curve = 0.5;//1.0;
-const double _other = 0.5;//1.0;
-const double _slow = 0.5;
-const double _jiwajiwa = 0.15;
-const double _test = 0.3;
-
-double refvel[ 50 ] = 
-	{/*A*/_straight,/*B*/_curve,/*C*/_straight,/*D*/_curve,/*E*/_straight,/*F*/_curve,/*G*/_other,/*H*/_other,/*I*/_other,/*J*/_other,/*K*/_slow,/*L*/
-	/*M*/_test,/*N*/_test,/*O*/_test};
-//{/*A*/1.5,/*B*/1.0,/*C*/1.5,/*D*/1.0,/*E*/1.5,/*F*/1.0,/*G*/1.1,/*H*/0.8,/*I*/0.6,/*J*/0.6};
-//{/*A*/0.3,/*B*/0.3,/*C*/0.3,/*D*/0.3,/*E*/0.3,/*F*/0.3,/*G*/0.3,/*H*/0.3,/*I*/0.3,/*J*/0.3};//{/*A*/1.0,/*B*/1.0,/*C*/1.0,/*D*/1.0,/*E*/1.0,/*F*/1.0,/*G*/1.0,/*H*/1.0,/*I*/1.0,/*J*/1.0};
-//{/*A*/1.2,/*B*/1.0,/*C*/1.2,/*D*/1.0,/*E*/1.2,/*F*/1.0,/*G*/1.1,/*H*/1.0,/*I*/1.1,/*J*/1.2};
-//{/*A*/1.5,/*B*/0.7,/*C*/1.5,/*D*/0.7,/*E*/1.5,/*F*/0.7,/*G*/1.0,/*H*/0.7,/*I*/0.7,/*J*/0.7};
-
-double refangle[ 50 ] = 
-	{/*A*/0.0,/*B*/0.0,/*C*/0.0,/*D*/0.0,/*E*/0.0,/*F*/0.0,/*G*/0.0,/*H*/0.0,/*I*/0.0,/*J*/0.0,/*K*/0.0,/*L*/		// スラロームからゲルゲ受け渡しまで
-	/*M*/1.5708,/*N*/1.5708,/*O*/1.74533};
-
-/*** SDカード利用のためにちゅいか　2019/05/05 ***/
-double Px_SD[ STATE_ALL * 3 + 1 ], Py_SD[ STATE_ALL * 3 + 1 ], refvel_SD[ STATE_ALL ], refkakudo_SD[ STATE_ALL ], refangle_SD[ STATE_ALL ];
-/*** SDカード利用のためにちゅいか　2019/05/05 ***/
-
-// ベジエ曲線関連
-double Ax[ STATE_ALL ];
-double Bx[ STATE_ALL ];
-double Cx[ STATE_ALL ];
-double Dx[ STATE_ALL ];
-
-double Ay[ STATE_ALL ];
-double By[ STATE_ALL ];
-double Cy[ STATE_ALL ];
-double Dy[ STATE_ALL ];
-
-// 内積関連
-double a_be[ STATE_ALL ];
-double b_be[ STATE_ALL ];
-double c_be[ STATE_ALL ];
-double d_be[ STATE_ALL ];
-double e_be[ STATE_ALL ];
-double f_be[ STATE_ALL ];
-double d_be_[ STATE_ALL ];
-double e_be_[ STATE_ALL ];
-double f_be_[ STATE_ALL ];
-
-double t_be = 0.0;
-double pre_t_be = 0.1;
-double epsilon = 1.0;
-
-double refVxg, refVyg, refVzg; // グローバル座標系の指定速度
 int EncountA = 0, EncountB = 0, EncountC = 0;
 int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
-boolean flag_jiwajiwa = false;
 
 int count_10ms = 0;//0;
 boolean flag_10ms = false;
 boolean flag_20ms = false;
 boolean flag_5s = false;
+
+// 赤か青か
+int zone;
+
+// phase で動作フェーズを管理
+int phase = 0;
+// 0 : スタートゾーンで待機するフェーズ（指令値一定）
+//    【フェーズ移行条件】：スイッチが押されるまで
+// 1 : ベジエ曲線を，ロボットの角度が接線方向になるように追従するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+// 2 : ゲルゲ受け渡し後に，じわじわ動いて壁に接触するフェーズ（指令値一定）
+//    【フェーズ移行条件】：すべてのリミットスイッチが押された状態になったら
+// 3 : シャガイの前に移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+// 4 : 所定の位置(シャガイ前)にとどまるフェーズ（位置制御）
+//    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
+// 5 : シャガイを取ったあと，スローイングゾーンの前に移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+// 6 : スローイングゾーンの前でとどまるフェーズ（位置制御）
+//    【フェーズ移行条件】：スイッチを押されたら
+// 7 : シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+// 8 : シャガイを投げる位置で待機するフェーズ（位置制御）
+//    【フェーズ移行条件】：スイッチを押されたら
+//(9): 2個目のシャガイの前まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
+//(10): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+//(11): シャガイを投げる位置で待機するフェーズ（位置制御）
+//    【フェーズ移行条件】：スイッチを押されたら
+//(12): 3個目のシャガイの前まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
+//(13): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+//(14): シャガイを投げる位置で待機するフェーズ（位置制御）
+//    【フェーズ移行条件】：スイッチを押されたら
 
 int data1[ 1300 ];//[ 12000 ];
 int data2[ 1300 ];
@@ -166,48 +105,15 @@ int *pdata5 = data5;
 int *pdata6 = data6;
 int *pdata7 = data7;
 
-byte swState = 0b00000000;	// 一番頭はflag代わりに使用
-
 /* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
 double Posix, Posiy, Posiz; */
 double tmpPosix = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
 
 
 // グローバル変数の設定
-double gPosix = Px[0], gPosiy = Py[0], gPosiz = 0.785398;//1.5708;//0;
-double angle_rad = gPosiz;
+double gPosix, gPosiy, gPosiz;//1.5708;//0;
+double angle_rad;
 const double _ANGLE_DEG = 45.0;
-
-// tを求めるための方程式
-double func(int p, double t)
-{
-    return a_be[p] * pow(t, 5.0) + b_be[p] * pow(t,4.0) + c_be[p] * pow(t,3.0) + d_be[p] * pow(t,2.0) + e_be[p] * t + f_be[p];
-}
-// tを求めるための方程式の1階微分
-double dfunc(int p, double t)
-{
-    return 5.0 * a_be[p] * pow(t, 4.0) +  4.0 * b_be[p] * pow(t,3.0) + 3.0 * c_be[p] * pow(t,2.0) + 2.0 * d_be[p] * t + e_be[p];
-}
-
-// tにおけるベジエ曲線の座標を求める関数
-double bezier_x(int p, double t)
-{
-    return Ax[p]*pow(t,3.0) + 3.0*Bx[p]*pow(t,2.0) + 3.0*Cx[p]*t + Dx[p];
-}
-double bezier_y(int p, double t)
-{
-    return Ay[p]*pow(t,3.0) + 3.0*By[p]*pow(t,2.0) + 3.0*Cy[p]*t + Dy[p];
-}
-
-// ベジエ曲線式の1階微分
-double dbezier_x(int p, double t)
-{
-    return 3.0*Ax[p]*pow(t,2.0) + 6.0*Bx[p]*t + 3.0*Cx[p];
-}
-double dbezier_y(int p, double t)
-{
-    return 3.0*Ay[p]*pow(t,2.0) + 6.0*By[p]*t + 3.0*Cy[p];
-}
 
 // 最大最小範囲に収まるようにする関数
 double min_max(double value, double minmax)
@@ -302,16 +208,17 @@ void timer_warikomi(){
 
 	static int count_5s = 0;
 	count_5s++;
-	if(count_5s >= 500){
+	if(count_5s == 500){
 		flag_5s = true;
+		phase = 1;
 	}
-	if( flag_5s ){
+	//if( flag_5s ){
 		count_10ms++;
 		if( count_10ms == 1 ){
 			flag_10ms = true;
 			count_10ms = 0;
 		}
-	}
+	//}
 	static int count_20ms = 0;
 	count_20ms++;
 	if( count_20ms == 2 ){
@@ -373,8 +280,6 @@ void setup() {
 		digitalWrite(PIN_LED3, HIGH);
 	}
 
-	//Serial.println(lpms.init());
-	
 	// VL53L0X
 	/* Wire.begin();
 	for (int i = 0; i < SENSOR_NUM; i++){
@@ -398,20 +303,8 @@ void setup() {
 		}
 	} */
 
-	// PID関連初期化
-	posiPIDx.PIDinit(0.0, 0.0);
-	posiPIDy.PIDinit(0.0, 0.0);
-	posiPIDz.PIDinit(0.0, 0.0);
-	
-	yokozurePID.PIDinit(0.0, 0.0);
-	kakudoPID.PIDinit(0.0, 0.0);
-
-	sokduo_filter.setSecondOrderPara(15.0, 1.0, 0.0);
-    kakudo_filter.setSecondOrderPara(7.0, 1.0, 0.0);
-
-	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+	/*** SDカード利用のために追加　2019/05/05 ***/
 	Serial.print("Initializing ...");
-	//Serial.println(mySD.init());
 	mySD.init();
 	Serial.print("Path reading ...");
 	
@@ -419,41 +312,25 @@ void setup() {
 
 	if( !digitalRead(51) ){	// 赤
 		digitalWrite(PIN_RED, HIGH);
-		Serial.println(mySD.path_read(RED, Px, Py, refvel, refangle));
+		Serial.println(mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle));
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
+		zone = RED;
 	}else{					// 青
 		digitalWrite(PIN_BLUE, HIGH);
-		Serial.println(mySD.path_read(BLUE, Px, Py, refvel, refangle));
+		Serial.println(mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle));
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
+		zone = BLUE;
 	}
 
-	Serial.println(Px[0]);
-	//Serial.println(mySD.path_read(BLUE, Px, Py, Vel, Angle));
-	//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
-	//Serial.print("Log file making ...");
-	//Serial.println(mySD.make_logfile());
+	Serial.println(motion.Px[0]);
 	mySD.make_logfile();
-	/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+	/*** SDカード利用のために追加　2019/05/05 ***/
 
-	for(int i = 0; i < STATE_ALL; i++) {
-        Ax[i] = Px[3*i+3] -3*Px[3*i+2] + 3*Px[3*i+1] - Px[3*i+0];
-        Ay[i] = Py[3*i+3] -3*Py[3*i+2] + 3*Py[3*i+1] - Py[3*i+0];
-        Bx[i] = Px[3*i+2] -2*Px[3*i+1] + Px[3*i+0];
-        By[i] = Py[3*i+2] -2*Py[3*i+1] + Py[3*i+0];
-        Cx[i] = Px[3*i+1] - Px[3*i+0];
-        Cy[i] = Py[3*i+1] - Py[3*i+0];
-        Dx[i] = Px[3*i+0];
-        Dy[i] = Py[3*i+0];
-    }
-
-    for(int i = 0; i < STATE_ALL; i++) {
-        a_be[i] = pow(Ax[i], 2.0) + pow(Ay[i], 2.0);
-        b_be[i] = 5*(Ax[i]*Bx[i] + Ay[i]*By[i]);
-        c_be[i] = 2*((3*pow(Bx[i],2.0)+2*Ax[i]*Cx[i]) + (3*pow(By[i],2.0)+2*Ay[i]*Cy[i]));
-        d_be_[i] = 9*Bx[i]*Cx[i] + 9*By[i]*Cy[i];
-        e_be_[i] = 3*pow(Cx[i],2.0) + 3*pow(Cy[i],2.0);
-        f_be_[i] = 0;
-    }
+	motion.initSettings(); // これをやっていないと足回りの指令速度生成しない
+	
+	gPosix = motion.Px[0];
+	gPosiy = motion.Py[0];
+	gPosiz = 0.785398;//1.5708;//0;
 
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
@@ -474,21 +351,13 @@ void setup() {
 
 
 void loop() {
-	static int dataCount = 0;
+	//static int dataCount = 0;
 
-	double refKakudo;
-
-
-	static int phase = 0;
-		static boolean mode = true; // true:ベジエモード，false:位置制御かRoboClaw停止モード
-		double refVx, refVy, refVz;
-
-		double onx, ony;    //ベジエ曲線上の点
-
-		double angle, dist;
-
-		double syusoku;
-	/* if( !digitalRead(PIN_SW) ){
+	double refVx, refVy, refVz;
+	int syusoku;
+	
+	/* if( !digitalRead
+	(PIN_SW) ){
 		reboot_function();
 	} */
 	if( flag_20ms ){
@@ -508,200 +377,206 @@ void loop() {
 			Serial.print("\t");
 		}
 		Serial.println(); */
-		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		
+		/*** SDカード利用のために追加　2019/05/05 ***/
 		String dataString = "";
 		static bool first_write = true;
 		if(first_write){
-			dataString += "phase,onx,ony,gPosix,gPosiy,gPosiz,angle,dist";
+			dataString += "phase,onx,ony,gPosix,gPosiy,gPosiz,angle,dist,refKakudo";
 			mySD.write_logdata(dataString);
 			first_write = false;
 			dataString = "";
 		}
-		dataString += String(phase) + "," + String(onx, 4) + "," + String(ony, 4);
+		dataString += String(motion.getPathNum()) + "," + String(motion.onx, 4) + "," + String(motion.ony, 4);
 		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
-		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4) + "," + String(syusoku, 4) + "," + String(t_be, 4);
+		dataString += "," + String(motion.angle, 4)  + "," + String(motion.dist, 4) + "," + String(motion.refKakudo, 4) + "," + String(motion.dist2goal, 4) + "," + String(motion.t_be, 4);
 		
 		mySD.write_logdata(dataString);
-		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		/*** SDカード利用のために追加　2019/05/05 ***/
 	}
 
 	flag_20ms = false;
 
-	if( flag_10ms ){		
-		/* static int phase = 0;
-		static boolean mode = true; // true:ベジエモード，false:位置制御かRoboClaw停止モード
-		double refVx, refVy, refVz;
+	if( flag_10ms ){
+		int pathNum = motion.getPathNum();
+		int conv;
+		
+		if(phase == 0){
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+		}else if(phase == 1){ // ゲルゲ受け渡しまで
+			if(motion.getMode() != FOLLOW_TANGENT) motion.setMode(FOLLOW_TANGENT); // 接線方向を向くモードになっていなかったら変更
+			
+			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			if(syusoku == 1){
+				if( pathNum < STATE1 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
-		double onx, ony;    //ベジエ曲線上の点
+					if( pathNum == (STATE1 - 1) ) phase = 2;
+				}
+			}
+			refVx = motion.refVx;
+			refVy = motion.refVy;
+			refVz = motion.refVz;
+		
+		}else if(phase == 2){ // じわじわ動いて位置補正
+			byte swState = 0b00000000;
+			if( !digitalRead(A0) ) swState |= 0b00000001;	// 青用
+			if( !digitalRead(A1) ) swState |= 0b00000010;	// 青用
+			if( !digitalRead(A2) ) swState |= 0b00000100;	// 前
+			if( !digitalRead(A3) ) swState |= 0b00001000;	// 前
+			if( !digitalRead(A4) ) swState |= 0b00010000;	// 赤用
+			if( !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
+			
+			if(zone = BLUE){
+				// サイドのスイッチが押されていた場合
+				if((swState & 0b00000011) == 0b00000011) refVy = 0.0;
+				else refVy = -0.15;
+				
+				// フロントのスイッチが押されていた場合
+				if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
+				else refVx = 0.15;
+				
+				// 両方押されていた場合
+				if((swState & 0b00001111) == 0b00001111){
+					gPosix = 6.058;
+					gPosiy = 8.245;
+					gPosiz = 0.0;
 
-		double angle, dist;
+					motion.Px[3*phase+3] = gPosix;
+					motion.Py[3*phase+3] = gPosiy;
+					phase = 3;
+				} 
+			}else{
+				// サイドのスイッチが押されていた場合
+				if((swState & 0b00110000) == 0b00110000) refVy = 0.0;
+				else refVy = 0.15;
+				// フロントのスイッチが押されていた場合
+				if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
+				else refVx = 0.15;
+				
+				// 両方押されていた場合
+				if((swState & 0b00111100) == 0b00111100){
+					gPosix = 6.058; // ここは変えてね！
+					gPosiy = 8.245;
+					gPosiz = 0.0;
 
-		double syusoku; */
-
-		if( !digitalRead(A0) ) swState |= 0b00000001;	// 青用
-		if( !digitalRead(A1) ) swState |= 0b00000010;	// 青用
-		if( !digitalRead(A2) ) swState |= 0b00000100;	// 前
-		if( !digitalRead(A3) ) swState |= 0b00001000;	// 前
-		if( !digitalRead(A4) ) swState |= 0b00010000;	// 赤用
-		if( !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
-
-		if( swState == 0b00111100/*赤*/ || swState == 0b00001111/*青*/ ){
-			gPosix = 6.058;
-			gPosiy = 8.245;
-			gPosiz = 0.0;
-
-			Px[3*phase+3] = gPosix;
-			Py[3*phase+3] = gPosiy;
-			phase++;
-			pre_t_be = 0.1;
-
-			flag_jiwajiwa = false;
-			swState |= 0b10000000; // このif文に何度も入らないように，一番最初の数字をflagとして使用
-			//digitalWrite(PIN_LED1, HIGH);
+					motion.Px[3*phase+3] = gPosix;
+					motion.Py[3*phase+3] = gPosiy;
+					phase = 3;
+				}
+			}
 		}
-		if(phase == 11){
+		
+		else if(phase == 3){ // シャガイの前まで
+			// if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指令した方向を向くモードになっていなかったら変更
+			
+			// syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			// if(syusoku == 1){
+			// 	if( pathNum < STATE1 ){
+			// 		motion.Px[3*pathNum+3] = gPosix;
+			// 		motion.Py[3*pathNum+3] = gPosiy;
+			// 		motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+			// 		if( pathNum == (STATE1 - 1) ) phase = 4;
+			// 	}
+			// }
+			// refVx = motion.refVx;
+			// refVy = motion.refVy;
+			// refVz = motion.refVz;
+
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+		}
+
+		if(pathNum == 11){
 			digitalWrite(PIN_LED1, HIGH);
 		}
 
-		// ベジエ曲線
-		if( mode ){//if( phase < 10 ){
-			static int kari = 0;
-		if( kari < 51 ){
-			Serial.print(kari);
-			Serial.print("\t");
-			Serial.print(Px[kari]);
-			Serial.print("\t");
-			Serial.println(Py[kari]);
-			kari++;
-		}
-			pidPreError_update = false; // 位置制御モードになったら最初だけpreErrorを現在の値で作成
+		// // ベジエ曲線
+		// if( mode ){//if( phase < 10 ){
+		// 	static int kari = 0;
+		// if( kari < 51 ){
+		// 	Serial.print(kari);
+		// 	Serial.print("\t");
+		// 	Serial.print(Px[kari]);
+		// 	Serial.print("\t");
+		// 	Serial.println(Py[kari]);
+		// 	kari++;
+		// }
+		// 	pidPreError_update = false; // 位置制御モードになったら最初だけpreErrorを現在の値で作成
+			
+		// 	if( phase < ( STATE1 - 1) ){ // スラロームからゲルゲ受け渡しまで
+		// 		// 接線方向を向くモードになっていなかったら変更
+		// 		if(motion.getMode() != FOLLOW_TANGENT) motion.setMode(FOLLOW_TANGENT);
+        // 	}else{
+		// 		// 指令した方向を向くモードになっていなかったら変更
+		// 		if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND);				
+        // 	}
+			
+		// 	int conv = motion.calc_refvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+		// 	if(conv == 1){
+		// 		int pathNum = motion.getPathNum();
+		// 		if( pathNum < STATE1 ){
+		// 			Px[3*pathNum+3] = gPosix;
+		// 			Py[3*pathNum+3] = gPosiy;
+		// 			motion.incrPhase(0.02, 0.997);
+		// 		}else if( pathNum == STATE1 ){
+		// 			flag_jiwajiwa = true;
+		// 		}else{// 位置制御前は早めに次のフェーズへ
+		// 			if(syusoku <= 0.3 || t_be >= 0.997){//(syusoku <= 0.25 || t_be >= 0.997){
+		// 				//digitalWrite(PIN_LED2, HIGH);
+		// 				Px[3*phase+3] = gPosix;
+		// 				Py[3*phase+3] = gPosiy;
+		// 				phase++;
+		// 				pre_t_be = 0.1;
+						
+						
+		// 				mode = false; // 位置制御モードに変更
+		// 			}
+		// 		}
+		// 	}
+			
+			
+		// // 位置制御　または　停止モード
+		// } else {
+		// 	//digitalWrite(PIN_LED1, HIGH);
+		// 	// PIDのpreError更新(最初のみ)
+		// 	if( !pidPreError_update ){
+		// 		posiPIDx.PIDinit(Px[3*phase], gPosix);	// ref, act
+		// 		posiPIDy.PIDinit(Py[3*phase], gPosiy);
+		// 		posiPIDz.PIDinit(refangle[phase], gPosiz);
+		// 		pidPreError_update = true; // ベジエモードに入ったらfalseになる．
+		// 	}
 
-			double tmpx = Px[phase*3] - gPosix;
-			double tmpy = Py[phase*3] - gPosiy;
-			
-			d_be[phase] = d_be_[phase] + Ax[phase] * tmpx + Ay[phase] * tmpy;
-			e_be[phase] = e_be_[phase] + 2*Bx[phase] * tmpx + 2*By[phase] * tmpy;
-			f_be[phase] = f_be_[phase] + Cx[phase] * tmpx + Cy[phase] * tmpy;
-			
-			int count_newton = 0;
-			do {
-				t_be = pre_t_be - func(phase, pre_t_be)/dfunc(phase, pre_t_be);
-				epsilon = abs((t_be - pre_t_be)/pre_t_be);
-				
-				//if(t_be < 0) t_be = 0.0;
-				//else if(t_be > 1.0) t_be = 1.0;
-				
-				pre_t_be = t_be;
-				count_newton++;
-			}while(epsilon >= 1e-4 && count_newton <= 50);
-			
-			//double onx, ony;    //ベジエ曲線上の点
-			onx = bezier_x(phase, t_be);
-			ony = bezier_y(phase, t_be);
-			
-			// 外積による距離導出
-			//double angle;
-			angle = atan2(dbezier_y(phase, t_be), dbezier_x(phase, t_be)); // ベジエ曲線の接線方向
-			//double dist;
-			dist = (ony - gPosiy)*cos(angle) - (onx - gPosix)*sin(angle);
-			
-			double refVtan, refVper, refVrot;
-			refVtan = sokduo_filter.SecondOrderLag(refvel[phase]);
-			refVper = yokozurePID.getCmd(dist, 0.0, refvel[phase]);
-			//refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
-			if( phase < ( STATE1 - 1) ){ // スラロームからゲルゲ受け渡しまで
-				refVrot = kakudoPID.getCmd(angle, gPosiz, 1.57);//(refKakudo, gPosiz, 1.57);
-			}else{
-				//digitalWrite(PIN_LED2, HIGH);
-				refKakudo = kakudo_filter.SecondOrderLag(refangle[phase]);
-				refVrot = kakudoPID.getCmd(refKakudo, gPosiz, 1.57);
-			}
-			
-			// ローカル座標系の指令速度(グローバル座標系のも込み込み)
-			refVx =  refVtan * cos( gPosiz - angle ) + refVper * sin( gPosiz - angle );
-			refVy = -refVtan * sin( gPosiz - angle ) + refVper * cos( gPosiz - angle );
-			refVz =  refVrot;//0.628319;だと10秒で旋回？
-			
-			//double syusoku;
-			syusoku = sqrt(pow(gPosix-Px[3*phase+3], 2.0) + pow(gPosiy-Py[3*phase+3], 2.0));
-			if( phase < STATE1 ){
-				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
-					//digitalWrite(PIN_LED1, HIGH);
-					Px[3*phase+3] = gPosix;
-					Py[3*phase+3] = gPosiy;
-					phase++;
-					pre_t_be = 0.1;
-				}
-			}else if( phase == STATE1 ){
-				if(syusoku <= 0.02 || t_be >= 0.997){
-					flag_jiwajiwa = true;
-				}
-			/* }else if( phase == ( STATE_ALL - 2 ) ){
-				if(syusoku <= 0.02 || t_be >= 0.997){//(syusoku <= 0.05 || t_be >= 0.997){
-					Px[3*phase+3] = gPosix;
-					Py[3*phase+3] = gPosiy;
-					phase++;
-					pre_t_be = 0.1;
-				} */
-			}else{// 位置制御前は早めに次のフェーズへ
-				if(syusoku <= 0.3 || t_be >= 0.997){//(syusoku <= 0.25 || t_be >= 0.997){
-					//digitalWrite(PIN_LED2, HIGH);
-					Px[3*phase+3] = gPosix;
-					Py[3*phase+3] = gPosiy;
-					phase++;
-					pre_t_be = 0.1;
-					mode = false; // 位置制御モードに変更
-				}
-			}
-			
-			epsilon = 1.0;
-		// 位置制御　または　停止モード
-		} else {
-			//digitalWrite(PIN_LED1, HIGH);
-			// PIDのpreError更新(最初のみ)
-			if( !pidPreError_update ){
-				posiPIDx.PIDinit(Px[3*phase], gPosix);	// ref, act
-				posiPIDy.PIDinit(Py[3*phase], gPosiy);
-				posiPIDz.PIDinit(refangle[phase], gPosiz);
-				pidPreError_update = true; // ベジエモードに入ったらfalseになる．
-			}
+		// 	// PIDクラスを使って位置制御を行う(速度の指令地を得る)
+		// 	refVxg = posiPIDx.getCmd(Px[3*phase], gPosix, refvel[phase]);//(Px[30], gPosix, refvel[phase]);
+		// 	refVyg = posiPIDy.getCmd(Py[3*phase], gPosiy, refvel[phase]);//(Py[30], gPosiy, refvel[phase]);
+		// 	refVzg = posiPIDz.getCmd(refangle[phase], gPosiz, refvel[phase]);//(0.0, gPosiz, refvel[phase]);
 
-			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-			refVxg = posiPIDx.getCmd(Px[3*phase], gPosix, refvel[phase]);//(Px[30], gPosix, refvel[phase]);
-			refVyg = posiPIDy.getCmd(Py[3*phase], gPosiy, refvel[phase]);//(Py[30], gPosiy, refvel[phase]);
-			refVzg = posiPIDz.getCmd(refangle[phase], gPosiz, refvel[phase]);//(0.0, gPosiz, refvel[phase]);
+		// 	// 上記はグローバル座標系における速度のため，ローカルに変換
+		// 	refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
+		// 	refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
+		// 	refVz =  refVzg;
 
-			// 上記はグローバル座標系における速度のため，ローカルに変換
-			refVx =  refVxg * cos(gPosiz) + refVyg * sin(gPosiz);
-			refVy = -refVxg * sin(gPosiz) + refVyg * cos(gPosiz);
-			refVz =  refVzg;
+		// 	syusoku = sqrt(pow(gPosix-Px[3*phase], 2.0) + pow(gPosiy-Py[3*phase], 2.0));
+		// 	if(syusoku <= 0.05){
+		// 		//Px[3*phase+3] = gPosix;
+		// 		//Py[3*phase+3] = gPosiy;
+		// 		//phase++;
+		// 		refVx = 0.0;
+		// 		refVy = 0.0;
+		// 		refVz = 0.0;
 
-			syusoku = sqrt(pow(gPosix-Px[3*phase], 2.0) + pow(gPosiy-Py[3*phase], 2.0));
-			if(syusoku <= 0.05){
-				//Px[3*phase+3] = gPosix;
-				//Py[3*phase+3] = gPosiy;
-				//phase++;
-				refVx = 0.0;
-				refVy = 0.0;
-				refVz = 0.0;
-
-				/* if( !digitalRead(A0) ){ // コントローラや上半身からの指令
-					mode = true; // ベジエモードに変更
-				} */
-			}
-		}
-
-		if( phase == STATE1 && flag_jiwajiwa ){
-			refVx =  0.15;
-			refVy = -0.15;
-
-			if( !digitalRead(A0) && !digitalRead(A1) ) refVy = 0.0;	// 青用
-			if( !digitalRead(A2) && !digitalRead(A3) ) refVx = 0.0;// 前
-			//if( !digitalRead(A4) || !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
-
-			
-			refVz =  0.0;
-		}
+		// 		/* if( !digitalRead(A0) ){ // コントローラや上半身からの指令
+		// 			mode = true; // ベジエモードに変更
+		// 		} */
+		// 	}
+		// }
 
 		// ローカル速度から，各車輪の角速度を計算
 		double refOmegaA, refOmegaB, refOmegaC, refOmegaD;
@@ -756,7 +631,7 @@ void loop() {
 		//Serial.print( "\t" );
 		//Serial.println(phase);//( gPosiz, 2 );
 
-		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		/*** SDカード利用のために追加　2019/05/05 ***/
 		/* String dataString = "";
 		static bool first_write = true;
 		if(first_write){
@@ -770,7 +645,7 @@ void loop() {
 		dataString += "," + String(angle, 4)  + "," + String(dist, 4) + "," + String(refKakudo, 4) + "," + String(syusoku, 4) + "," + String(t_be, 4);
 		
 		mySD.write_logdata(dataString); */
-		/*** SDカード利用のためにちゅいか　2019/05/05 ***/
+		/*** SDカード利用のために追加　2019/05/05 ***/
 
 		/* if( dataCount < 1200){//11990 ){
 			*(pdata1 + dataCount) = ( int )( onx * 1000 );

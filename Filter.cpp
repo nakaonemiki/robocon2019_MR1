@@ -34,6 +34,11 @@ void Filter::setSecondOrderPara(double xOmega, double xDzeta, double init_data)
     set_secorder = true;
 }
 
+void Filter::initPrevData(double init_data)
+{
+    prev_output2 = prev_output1 = init_data;
+}
+
 double Filter::SecondOrderLag(double input)
 {
     if(!set_secorder) {

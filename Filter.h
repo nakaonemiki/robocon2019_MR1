@@ -16,6 +16,7 @@ public:
     double LowPassFilter(double input);
     
     void setSecondOrderPara(double xOmega, double xDzeta, double init_data);
+    void initPrevData(double init_data);
     double SecondOrderLag(double input);
     
     void setNotchPara(double Omega, double init_data);
