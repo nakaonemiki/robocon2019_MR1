@@ -332,6 +332,8 @@ void setup() {
 	gPosiy = motion.Py[0];
 	gPosiz = 0.785398;//1.5708;//0;
 
+	motion.setConvPara(0.02, 0.997); // 初期化
+
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
@@ -411,11 +413,12 @@ void loop() {
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
 				if( pathNum < STATE1 ){
+					digitalWrite(PIN_LED2, HIGH);
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
-					if( pathNum == (STATE1 - 1) ) phase = 2;
+					if( pathNum == STATE1 ) phase = 2;
 				}
 			}
 			refVx = motion.refVx;
@@ -472,6 +475,14 @@ void loop() {
 		}
 		
 		else if(phase == 3){ // シャガイの前まで
+			// 目標位置
+			motion.Px[3*pathNum] = 6.475;
+			motion.Py[3*pathNum] = 8.725;
+			
+			if(motion.getMode() != FOLLOW_ICHIPID) motion.setMode(FOLLOW_ICHIPID);
+
+			
+
 			// if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指令した方向を向くモードになっていなかったら変更
 			
 			// syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
