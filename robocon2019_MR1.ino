@@ -20,6 +20,8 @@
 
 #define PIN_RED		(44)
 #define PIN_BLUE	(45)
+#define PIN_BUTTON1 (49)
+#define PIN_BUTTON2 (50)
 
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
@@ -82,15 +84,19 @@ int phase = 0;
 //    【フェーズ移行条件】：スイッチを押されたら
 //(11): 2個目のシャガイの前まで移動するフェーズ（軌道追従制御）
 //    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
-//(12): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
-//    【フェーズ移行条件】：path_num が所定の数値になったら
-//(13): シャガイを投げる位置で待機するフェーズ（位置制御）
-//    【フェーズ移行条件】：スイッチを押されたら
-//(14): 3個目のシャガイの前まで移動するフェーズ（軌道追従制御）
+//(12): 所定の位置(シャガイ前)にとどまるフェーズ（位置制御）
 //    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
-//(15): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
+//(13): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
 //    【フェーズ移行条件】：path_num が所定の数値になったら
-//(16): シャガイを投げる位置で待機するフェーズ（位置制御）
+//(14): シャガイを投げる位置で待機するフェーズ（位置制御）
+//    【フェーズ移行条件】：スイッチを押されたら
+//(15): 3個目のシャガイの前まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
+//(16): 所定の位置(シャガイ前)にとどまるフェーズ（位置制御）
+//    【フェーズ移行条件】：シャガイハンド閉じて，持ち上げたら / スイッチを押されたら
+//(17): シャガイを投げる位置まで移動するフェーズ（軌道追従制御）
+//    【フェーズ移行条件】：path_num が所定の数値になったら
+//(18): シャガイを投げる位置で待機するフェーズ（位置制御）
 //    【フェーズ移行条件】：スイッチを押されたら
 
 int data1[ 1300 ];//[ 12000 ];
@@ -312,16 +318,18 @@ void setup() {
 	mySD.init();
 	Serial.print("Path reading ...");
 	
-	while( digitalRead(49) && digitalRead(50) );
-
+	while( digitalRead(PIN_BUTTON1) && digitalRead(PIN_BUTTON2) );
+	int actpathnum;
 	if( !digitalRead(51) ){	// 赤
 		digitalWrite(PIN_RED, HIGH);
-		Serial.println(mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle));
+		actpathnum = mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle);
+		Serial.println(actpathnum);
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
 		zone = RED;
 	}else{					// 青
 		digitalWrite(PIN_BLUE, HIGH);
-		Serial.println(mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle));
+		actpathnum = mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle);
+		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
 		zone = BLUE;
 	}
@@ -331,12 +339,12 @@ void setup() {
 	/*** SDカード利用のために追加　2019/05/05 ***/
 
 	motion.initSettings(); // これをやっていないと足回りの指令速度生成しない
-	
+	motion.setConvPara(0.02, 0.997); // 初期化
+	motion.setMaxPathnum(actpathnum); // パス数の最大値
+
 	gPosix = motion.Px[0];
 	gPosiy = motion.Py[0];
 	gPosiz = 0.785398;//1.5708;//0;
-
-	motion.setConvPara(0.02, 0.997); // 初期化
 
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
@@ -414,7 +422,7 @@ void loop() {
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
-			if(pre_buttonstate == 0 && digitalRead(49) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 1;
 			}
 		///// phase 1 /////////////////////////////////////////////////////////////////////////
@@ -430,10 +438,16 @@ void loop() {
 
 					if( pathNum == STATE1 ) phase = 2;
 				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
+			
 		///// phase 2 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 2){ // じわじわ動いて位置補正
 			byte swState = 0b00000000;
@@ -514,10 +528,15 @@ void loop() {
 				motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
 				phase = 4;
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
 		///// phase 4 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 4){ // 位置制御で角度を変える
 			if(motion.getMode() != POSITION_PID) motion.setMode(POSITION_PID);
@@ -530,10 +549,15 @@ void loop() {
 				motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
 				phase = 5;
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
 		///// phase 5 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 5){ // シャガイの前まで移動
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
@@ -547,17 +571,22 @@ void loop() {
 
 					if( pathNum == STATE2 ) phase = 6;
 				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
 		///// phase 6 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 6){ // シャガイの前で待機(本当はシャガイハンド上げたら次のフェーズに移行)
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(49) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 7;
 			}			
 		///// phase 7 /////////////////////////////////////////////////////////////////////////	
@@ -573,17 +602,22 @@ void loop() {
 
 					if( pathNum == STATE3 ) phase = 8;
 				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
 		///// phase 8 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 8){ // シャガイの前で待機(ここでシャガイを取得する一連の動作を行う)
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(49) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 9;
 			}			
 		///// phase 9 /////////////////////////////////////////////////////////////////////////	
@@ -599,17 +633,22 @@ void loop() {
 
 					if( pathNum == STATE4 ) phase = 9;
 				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
 		///// phase 10 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 10){ // 投擲位置で待機(ここで投げる動作をする)
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(49) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 11;
 			}			
 		///// phase 11 /////////////////////////////////////////////////////////////////////////	
@@ -625,11 +664,113 @@ void loop() {
 
 					if( pathNum == STATE5 ) phase = 12;
 				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
 			}
-			refVx = motion.refVx;
-			refVy = motion.refVy;
-			refVz = motion.refVz;
-		///// phase 10 /////////////////////////////////////////////////////////////////////////
+		///// phase 12 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 12){ // シャガイの前で待機(ここでシャガイを取得する一連の動作を行う)
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				phase = 13;
+			}			
+		///// phase 13 /////////////////////////////////////////////////////////////////////////	
+		}else if(phase == 13){ // 投擲位置まで移動
+			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
+			
+			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			if(syusoku == 1){
+				if( pathNum < STATE6 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE6 ) phase = 9;
+				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+			}
+		///// phase 14 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 14){ // 投擲位置で待機(ここで投げる動作をする)
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				phase = 15;
+			}			
+		///// phase 15 /////////////////////////////////////////////////////////////////////////	
+		}else if(phase == 15){ // 3個目のシャガイの位置まで移動
+			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
+			
+			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			if(syusoku == 1){
+				if( pathNum < STATE7 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE7 ) phase = 16;
+				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+			}
+		///// phase 16 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 16){ // シャガイの前で待機(ここでシャガイを取得する一連の動作を行う)
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				phase = 17;
+			}			
+		///// phase 17 /////////////////////////////////////////////////////////////////////////	
+		}else if(phase == 17){ // 投擲位置まで移動
+			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
+			
+			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			if(syusoku == 1){
+				if( pathNum < STATE8 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE8 ) phase = 18;
+				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+			}
+		///// phase 18 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 18){ // 投擲位置で待機(ここで投げる動作をする)
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;			
 		}
 		
 
@@ -853,7 +994,7 @@ void loop() {
 		Serial.print();
 		Serial.print(); */
 
-		pre_buttonstate = digitalRead(49);
+		pre_buttonstate = digitalRead(PIN_BUTTON1);
 		flag_10ms = false;
 	}
 }

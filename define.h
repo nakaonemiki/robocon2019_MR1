@@ -5,9 +5,14 @@
 
 // フェーズ管理
 #define STATE1      ( 10 )// スタートからゲルゲ受け渡しまで(0から数えて)
-#define STATE2      ( 1 )// ゲルゲ受け渡し後からシャガイ取得まで
-#define STATE3      ( 1 )// シャガイ取得後からスローイングゾーン待機まで
-#define STATE4      ( 2 )// スローイングゾーンでの走行
+#define STATE2      ( 13 )// ゲルゲ受け渡し後からシャガイ取得まで
+#define STATE3      ( 15 )// シャガイ取得後からスローイングゾーン待機まで
+#define STATE4      ( 17 )// 投擲位置まで移動
+#define STATE5      ( 19 )// 2個目のシャガイまで
+#define STATE6      ( 21 )// シャガイ取得後からスローイングゾーン待機まで
+#define STATE7      ( 23 )// 3個目のシャガイまで
+#define STATE8      ( 25 )// シャガイ取得後からスローイングゾーン待機まで
+
 #define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
 
 // VL53L0X

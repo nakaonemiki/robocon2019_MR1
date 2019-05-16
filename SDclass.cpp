@@ -73,6 +73,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   char tmpA[10], tmpB[10], tmpC[10], tmpD[10];
   bool file_end  = false;
   int numx = 0, numy = 0, numv = 0, numa = 0;
+  int path_num = 0, point_num = 0;
 
   // 赤か青かで読み込むファイルを変更する
   if(field == RED){
@@ -100,16 +101,20 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
       for(int i = 0; i < 10; i++) tmpA[i] = 0; // 文字列を初期化
       numx=0;
       Px++;
-      while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){ // 改行コードかセミコロンが来るまで繰り返し
+      while(((tmpchar = myFile.read()) != '\r' && tmpchar != ';') && tmpchar != '/'){ // 改行コードかセミコロン，スラッシュが来るまで繰り返し
         tmpB[numy] = tmpchar;
         numy++;
       }
       if(tmpchar == ';'){
         file_end = true;
+      }else if(tmpchar == '/'){ // コメントアウト対応
+        while(tmpchar = myFile.read() != '\n');
       }else{
         myFile.read(); // "\n"を捨てるため
       }
       *Py = str2double(tmpB, numy); //関数でdoubleに変換
+      point_num++;
+
       Serial.print(",");
       Serial.println(*Py);
       //Serial.println(tmpB);
@@ -151,6 +156,8 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
         myFile.read(); // "\n"を捨てるため
       }
       *angle = str2double(tmpD, numa); //関数でdoubleに変換
+      path_num++;
+
       //Serial.print(tmpB);
       Serial.print(",");
       Serial.println(*angle);
@@ -167,7 +174,10 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
     return -3;
   }
 
-  return 0;
+  if((int)((point_num - 2) / 3) == (path_num - 1)){
+    return path_num;
+  }
+  return -4;
 }
 
 double mySDclass::str2double(char* str, int num){

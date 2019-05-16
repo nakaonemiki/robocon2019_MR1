@@ -70,6 +70,8 @@ public:
     void setMode(int);
     int getMode();
 
+    void setMaxPathnum(int);
+
     void setPosiPIDxPara(float xKp, float xKi, float xKd);
     void setPosiPIDyPara(float xKp, float xKi, float xKd);
     void setPosiPIDzPara(float xKp, float xKi, float xKd);
@@ -79,6 +81,7 @@ public:
 private:
     int path_num;
     int mode;
+    int max_pathnum;
 
     double conv_length;
     double conv_tnum;

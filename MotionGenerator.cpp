@@ -22,6 +22,7 @@ Filter kakudo_filter(INT_TIME);
 // コンストラクタ
 MotionGenerator::MotionGenerator(int xmode){
     path_num = 0;
+    max_pathnum = 0;
     t_be = 0.0;
     pre_t_be = 0.1;
     epsilon = 1.0;
@@ -140,67 +141,72 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
     double refVxg, refVyg, refVzg; // グローバル座標系の指定速度
 
     if(init_done){
-        if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){ // ベジエ曲線追従モード
-            calcRefpoint(Posix, Posiy);
+        if(path_num <= max_pathnum){
+            if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){ // ベジエ曲線追従モード
+                calcRefpoint(Posix, Posiy);
 
-            double refVtan, refVper, refVrot;
-            refVtan = sokduo_filter.SecondOrderLag(refvel[path_num]); // 接線方向速度
-            refVper = yokozurePID.getCmd(dist, 0.0, refvel[path_num]); // 横方向速度
+                double refVtan, refVper, refVrot;
+                refVtan = sokduo_filter.SecondOrderLag(refvel[path_num]); // 接線方向速度
+                refVper = yokozurePID.getCmd(dist, 0.0, refvel[path_num]); // 横方向速度
 
-            // 旋回は以下の2種類を mode によって変える
-            if(mode == FOLLOW_TANGENT){
-                if(mode_changed){
-                    kakudoPID.PIDinit(angle, Posiz);
-                    mode_changed = false;
+                // 旋回は以下の2種類を mode によって変える
+                if(mode == FOLLOW_TANGENT){
+                    if(mode_changed){
+                        kakudoPID.PIDinit(angle, Posiz);
+                        mode_changed = false;
+                    }
+                    refVrot = kakudoPID.getCmd(angle, Posiz, 1.57);//(refKakudo, gPosiz, 1.57);
+                }else{
+                    if(mode_changed){
+                        kakudoPID.PIDinit(refKakudo, Posiz);
+                        kakudo_filter.initPrevData(refKakudo);
+                        mode_changed = false;
+                    }
+                    refKakudo = kakudo_filter.SecondOrderLag(refangle[path_num]);
+                    refVrot = kakudoPID.getCmd(refKakudo, Posiz, 1.57);
                 }
-                refVrot = kakudoPID.getCmd(angle, Posiz, 1.57);//(refKakudo, gPosiz, 1.57);
-            }else{
-                if(mode_changed){
-                    kakudoPID.PIDinit(refKakudo, Posiz);
+
+                // ローカル座標系の指令速度(グローバル座標系のも込み込み)
+                refVx =  refVtan * cos( Posiz - angle ) + refVper * sin( Posiz - angle );
+                refVy = -refVtan * sin( Posiz - angle ) + refVper * cos( Posiz - angle );
+                refVz =  refVrot;//0.628319;だと10秒で旋回？
+            }else{ // PID位置制御モード
+                if( mode_changed ){
+                    posiPIDx.PIDinit(Px[3 * path_num], Posix);	// ref, act
+                    posiPIDy.PIDinit(Py[3 * path_num], Posiy);
+                    posiPIDz.PIDinit(refangle[path_num], Posiz);
                     kakudo_filter.initPrevData(refKakudo);
                     mode_changed = false;
                 }
+
+                // PIDクラスを使って位置制御を行う(速度の指令地を得る)
+                refVxg = posiPIDx.getCmd(Px[3 * path_num], Posix, refvel[path_num]);//(Px[30], gPosix, refvel[phase]);
+                refVyg = posiPIDy.getCmd(Py[3 * path_num], Posiy, refvel[path_num]);//(Py[30], gPosiy, refvel[phase]);
                 refKakudo = kakudo_filter.SecondOrderLag(refangle[path_num]);
-                refVrot = kakudoPID.getCmd(refKakudo, Posiz, 1.57);
+                refVzg = posiPIDz.getCmd(refangle[path_num], Posiz, 1.57);//角速度に対してrefvelは遅すぎるから　refvel[path_num]);//(0.0, gPosiz, refvel[phase]);
+
+                // 上記はグローバル座標系における速度のため，ローカルに変換
+                refVx =  refVxg * cos(Posiz) + refVyg * sin(Posiz);
+                refVy = -refVxg * sin(Posiz) + refVyg * cos(Posiz);
+                refVz =  refVzg;
             }
 
-            // ローカル座標系の指令速度(グローバル座標系のも込み込み)
-            refVx =  refVtan * cos( Posiz - angle ) + refVper * sin( Posiz - angle );
-            refVy = -refVtan * sin( Posiz - angle ) + refVper * cos( Posiz - angle );
-            refVz =  refVrot;//0.628319;だと10秒で旋回？
-        }else{ // PID位置制御モード
-            if( mode_changed ){
-				posiPIDx.PIDinit(Px[3 * path_num], Posix);	// ref, act
-				posiPIDy.PIDinit(Py[3 * path_num], Posiy);
-				posiPIDz.PIDinit(refangle[path_num], Posiz);
-                kakudo_filter.initPrevData(refKakudo);
-				mode_changed = false;
-			}
-
-			// PIDクラスを使って位置制御を行う(速度の指令地を得る)
-			refVxg = posiPIDx.getCmd(Px[3 * path_num], Posix, refvel[path_num]);//(Px[30], gPosix, refvel[phase]);
-			refVyg = posiPIDy.getCmd(Py[3 * path_num], Posiy, refvel[path_num]);//(Py[30], gPosiy, refvel[phase]);
-            refKakudo = kakudo_filter.SecondOrderLag(refangle[path_num]);
-			refVzg = posiPIDz.getCmd(refangle[path_num], Posiz, 1.57);//角速度に対してrefvelは遅すぎるから　refvel[path_num]);//(0.0, gPosiz, refvel[phase]);
-
-			// 上記はグローバル座標系における速度のため，ローカルに変換
-			refVx =  refVxg * cos(Posiz) + refVyg * sin(Posiz);
-			refVy = -refVxg * sin(Posiz) + refVyg * cos(Posiz);
-			refVz =  refVzg;
+            // 収束判定して，収束していたら　1　を返す
+            dist2goal = sqrt(pow(Posix - Px[3 * path_num + 3], 2.0) + pow(Posiy - Py[3 * path_num + 3], 2.0));
+            if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){
+                // 軌道追従制御なら，到達位置からの距離とベジエ曲線の t のどちらかの条件
+                if(dist2goal <= conv_length || t_be >= conv_tnum) return 1;
+            }if(mode == POSITION_PID){
+                // 位置制御なら，目標位置と角度両方を見る
+                if(dist2goal <= conv_length && fabs(refangle[path_num] - Posiz)) return 1;
+            }
+            
+            // 収束していなかったら　0　を返す
+            return 0;
+        }else{
+            // path_num が設定されたmax_pathnumを超えたら　-2　を返す
+            return -2;
         }
-
-        // 収束判定して，収束していたら　1　を返す
-        dist2goal = sqrt(pow(Posix - Px[3 * path_num + 3], 2.0) + pow(Posiy - Py[3 * path_num + 3], 2.0));
-        if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){
-            // 軌道追従制御なら，到達位置からの距離とベジエ曲線の t のどちらかの条件
-            if(dist2goal <= conv_length || t_be >= conv_tnum) return 1;
-        }if(mode == POSITION_PID){
-            // 位置制御なら，目標位置と角度両方を見る
-            if(dist2goal <= conv_length && fabs(refangle[path_num] - Posiz)) return 1;
-        }
-        
-        // 収束していなかったら　0　を返す
-        return 0;
     
     }else{
         // 初期化されていなかったら　-1　を返す
@@ -232,6 +238,10 @@ void MotionGenerator::setMode(int xmode){
 
 int MotionGenerator::getMode(){
     return mode;
+}
+
+void MotionGenerator::setMaxPathnum(int num){
+    max_pathnum = num;
 }
 
 void MotionGenerator::setPosiPIDxPara(float xKp, float xKi, float xKd){
