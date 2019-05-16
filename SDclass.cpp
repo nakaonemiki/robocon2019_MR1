@@ -174,7 +174,7 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
     return -3;
   }
 
-  if((int)((point_num - 2) / 3) == (path_num - 1)){
+  if((int)((point_num - 2) / 3) >= (path_num - 1)){
     return path_num;
   }
   return -4;

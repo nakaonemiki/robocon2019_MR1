@@ -1,6 +1,6 @@
 //-----------------------------------------
-// ベジエ曲線に追従するときに必要になるベジエ曲線までのズレを計算するクラス
-// 2019/05/15 ueno
+// 軌道追従や位置のPID制御を行うためのクラス
+// 作成：2019/05/15 by Yuki Ueno
 //-----------------------------------------
 
 #include "MotionGenerator.h"
@@ -141,7 +141,7 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
     double refVxg, refVyg, refVzg; // グローバル座標系の指定速度
 
     if(init_done){
-        if(path_num <= max_pathnum){
+        if(path_num <= max_pathnum){ // パスが存在する場合は以下の処理を行う
             if(mode == FOLLOW_TANGENT || mode == FOLLOW_COMMAND){ // ベジエ曲線追従モード
                 calcRefpoint(Posix, Posiy);
 
