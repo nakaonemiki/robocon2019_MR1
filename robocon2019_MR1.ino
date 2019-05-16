@@ -220,7 +220,7 @@ void timer_warikomi(){
 	count_5s++;
 	if(count_5s == 500){
 		flag_5s = true;
-		phase = 1;
+		//phase = 1;
 	}
 	//if( flag_5s ){
 		count_10ms++;
@@ -329,6 +329,7 @@ void setup() {
 	}else{					// 青
 		digitalWrite(PIN_BLUE, HIGH);
 		actpathnum = mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle);
+		Serial.print("path num: ");
 		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
 		zone = BLUE;
@@ -372,6 +373,8 @@ void loop() {
 	static int wait_count = 0;
 	static bool pre_buttonstate = 1;
 	
+	byte swState = 0b00000000;
+
 	/* if( !digitalRead
 	(PIN_SW) ){
 		reboot_function();
@@ -398,14 +401,14 @@ void loop() {
 		String dataString = "";
 		static bool first_write = true;
 		if(first_write){
-			dataString += "phase,onx,ony,gPosix,gPosiy,gPosiz,angle,dist,refKakudo";
+			dataString += "phase,path_num,onx,ony,gPosix,gPosiy,gPosiz,angle,dist,refKakudo";
 			mySD.write_logdata(dataString);
 			first_write = false;
 			dataString = "";
 		}
-		dataString += String(motion.getPathNum()) + "," + String(motion.onx, 4) + "," + String(motion.ony, 4);
+		dataString += String(phase) + "," + String(motion.getPathNum()) + "," + String(motion.onx, 4) + "," + String(motion.ony, 4);
 		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
-		dataString += "," + String(motion.angle, 4)  + "," + String(motion.dist, 4) + "," + String(motion.refKakudo, 4) + "," + String(motion.dist2goal, 4) + "," + String(motion.t_be, 4);
+		dataString += "," + String(motion.angle, 4)  + "," + String(motion.dist, 4) + "," + String(motion.refKakudo, 4);
 		
 		mySD.write_logdata(dataString);
 		/*** SDカード利用のために追加　2019/05/05 ***/
@@ -431,7 +434,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE1 ){
+				if( pathNum <= STATE1 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -450,81 +453,93 @@ void loop() {
 			
 		///// phase 2 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 2){ // じわじわ動いて位置補正
-			byte swState = 0b00000000;
-			if( !digitalRead(A0) ) swState |= 0b00000001;	// 青用
-			if( !digitalRead(A1) ) swState |= 0b00000010;	// 青用
-			if( !digitalRead(A2) ) swState |= 0b00000100;	// 前
-			if( !digitalRead(A3) ) swState |= 0b00001000;	// 前
-			if( !digitalRead(A4) ) swState |= 0b00010000;	// 赤用
-			if( !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
-			
+			digitalWrite(PIN_LED2, HIGH);
+			refVx = 0.0;
+			refVy = 0.0;
 			refVz = 0.0;
 
-			if(zone = BLUE){
-				// サイドのスイッチが押されていた場合
-				if((swState & 0b00000011) == 0b00000011) refVy = 0.0;
-				else refVy = -0.15;
-				
-				// フロントのスイッチが押されていた場合
-				if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
-				else refVx = 0.15;
-				
-				// 両方押されていた場合
-				if((swState & 0b00001111) == 0b00001111){
-					wait_count++;
-					if(wait_count >= 100){ //1秒間待つ
-						gPosix = 6.058;
-						gPosiy = 8.245;
-						gPosiz = 0.0;
-
-						// 次の位置PIDにおける目標値
-						motion.Px[3 * pathNum] = 6.475;
-						motion.Py[3 * pathNum] = 8.725;
-
-						phase = 3;
-						wait_count = 0;
-					}
-					
-				} else {
-					wait_count = 0;
-				}
-			}else{
-				// サイドのスイッチが押されていた場合
-				if((swState & 0b00110000) == 0b00110000) refVy = 0.0;
-				else refVy = 0.15;
-				// フロントのスイッチが押されていた場合
-				if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
-				else refVx = 0.15;
-				
-				// 両方押されていた場合
-				if((swState & 0b00111100) == 0b00111100){
-					wait_count++;
-					if(wait_count >= 100){
-						gPosix = 6.058; // ここは変えてね！
-						gPosiy = 8.245;
-						gPosiz = 0.0;
-
-						// 次の位置PIDにおける目標値　　ここも変更してね
-						motion.Px[3 * pathNum] = 6.475;
-						motion.Py[3 * pathNum] = 8.725;
-
-						phase = 3;
-						wait_count = 0;
-					}
-				} else {
-					wait_count = 0;
-				}
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				motion.incrPathnum(0.02, 0.997);
+				phase = 3;
 			}
+			// //byte swState = 0b00000000;
+			// if( !digitalRead(A0) ) swState |= 0b00000001;	// 青用
+			// if( !digitalRead(A1) ) swState |= 0b00000010;	// 青用
+			// if( !digitalRead(A2) ) swState |= 0b00000100;	// 前
+			// if( !digitalRead(A3) ) swState |= 0b00001000;	// 前
+			// if( !digitalRead(A4) ) swState |= 0b00010000;	// 赤用
+			// if( !digitalRead(A5) ) swState |= 0b00100000;	// 赤用
+			
+			// refVz = 0.0;
+
+			// if(zone = BLUE){
+			// 	// サイドのスイッチが押されていた場合
+			// 	if((swState & 0b00000011) == 0b00000011) refVy = 0.0;
+			// 	else refVy = -0.15;
+				
+			// 	// フロントのスイッチが押されていた場合
+			// 	if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
+			// 	else refVx = 0.15;
+				
+			// 	// 両方押されていた場合
+			// 	if((swState & 0b00001111) == 0b00001111){
+			// 		wait_count++;
+			// 		if(wait_count >= 100){ //1秒間待つ
+			// 			gPosix = 6.058;
+			// 			gPosiy = 8.245;
+			// 			gPosiz = 0.0;
+
+			// 			// 次の位置PIDにおける目標値
+			// 			motion.Px[3 * pathNum] = 6.475;
+			// 			motion.Py[3 * pathNum] = 8.725;
+
+			// 			motion.incrPathnum(0.02, 0.997);
+			// 			phase = 3;
+			// 			wait_count = 0;
+			// 		}
+					
+			// 	} else {
+			// 		wait_count = 0;
+			// 	}
+			// }else{
+			// 	// サイドのスイッチが押されていた場合
+			// 	if((swState & 0b00110000) == 0b00110000) refVy = 0.0;
+			// 	else refVy = 0.15;
+			// 	// フロントのスイッチが押されていた場合
+			// 	if((swState & 0b00001100) == 0b00001100) refVx = 0.0;
+			// 	else refVx = 0.15;
+				
+			// 	// 両方押されていた場合
+			// 	if((swState & 0b00111100) == 0b00111100){
+			// 		wait_count++;
+			// 		if(wait_count >= 100){
+			// 			gPosix = 6.058; // ここは変えてね！
+			// 			gPosiy = 8.245;
+			// 			gPosiz = 0.0;
+
+			// 			// 次の位置PIDにおける目標値　　ここも変更してね
+			// 			motion.Px[3 * pathNum] = 6.475;
+			// 			motion.Py[3 * pathNum] = 8.725;
+
+			// 			motion.incrPathnum(0.02, 0.997);
+			// 			phase = 3;
+			// 			wait_count = 0;
+			// 		}
+			// 	} else {
+			// 		wait_count = 0;
+			// 	}
+			// }
 		}
 		///// phase 3 /////////////////////////////////////////////////////////////////////////
 		else if(phase == 3){ // 位置制御で壁から離れる
+			digitalWrite(PIN_LED1, HIGH);
 			if(motion.getMode() != POSITION_PID) motion.setMode(POSITION_PID);
 
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
 				motion.Px[3*pathNum+3] = gPosix;
 				motion.Py[3*pathNum+3] = gPosiy;
-				motion.refangle[pathNum] = 1.5708; // 次のフェーズでの目標角度
+				//motion.refangle[pathNum+1] = 1.5708; // 次のフェーズでの目標角度
 				motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
 				phase = 4;
@@ -543,7 +558,7 @@ void loop() {
 
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				digitalWrite(PIN_LED2, HIGH);
+				//digitalWrite(PIN_LED2, HIGH);
 				motion.Px[3*pathNum+3] = gPosix;
 				motion.Py[3*pathNum+3] = gPosiy;
 				motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -564,7 +579,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE2 ){
+				if( pathNum <= STATE2 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -595,7 +610,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE3 ){
+				if( pathNum <= STATE3 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -626,7 +641,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE4 ){
+				if( pathNum <= STATE4 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -771,11 +786,6 @@ void loop() {
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;			
-		}
-		
-
-		if(pathNum == 11){
-			digitalWrite(PIN_LED1, HIGH);
 		}
 
 		// // ベジエ曲線
@@ -993,6 +1003,15 @@ void loop() {
 		Serial.print();
 		Serial.print();
 		Serial.print(); */
+
+		
+		Serial.print(phase);
+		Serial.print("\t");
+		Serial.print(refVx);
+		Serial.print("\t");
+		Serial.print(refVy);
+		Serial.print("\t");
+		Serial.println(swState, BIN);
 
 		pre_buttonstate = digitalRead(PIN_BUTTON1);
 		flag_10ms = false;

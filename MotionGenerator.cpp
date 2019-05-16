@@ -172,16 +172,16 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
                 refVz =  refVrot;//0.628319;だと10秒で旋回？
             }else{ // PID位置制御モード
                 if( mode_changed ){
-                    posiPIDx.PIDinit(Px[3 * path_num], Posix);	// ref, act
-                    posiPIDy.PIDinit(Py[3 * path_num], Posiy);
+                    posiPIDx.PIDinit(Px[3 * path_num + 3], Posix);	// ref, act
+                    posiPIDy.PIDinit(Py[3 * path_num + 3], Posiy);
                     posiPIDz.PIDinit(refangle[path_num], Posiz);
                     kakudo_filter.initPrevData(refKakudo);
                     mode_changed = false;
                 }
 
                 // PIDクラスを使って位置制御を行う(速度の指令地を得る)
-                refVxg = posiPIDx.getCmd(Px[3 * path_num], Posix, refvel[path_num]);//(Px[30], gPosix, refvel[phase]);
-                refVyg = posiPIDy.getCmd(Py[3 * path_num], Posiy, refvel[path_num]);//(Py[30], gPosiy, refvel[phase]);
+                refVxg = posiPIDx.getCmd(Px[3 * path_num + 3], Posix, refvel[path_num]);//(Px[30], gPosix, refvel[phase]);
+                refVyg = posiPIDy.getCmd(Py[3 * path_num + 3], Posiy, refvel[path_num]);//(Py[30], gPosiy, refvel[phase]);
                 refKakudo = kakudo_filter.SecondOrderLag(refangle[path_num]);
                 refVzg = posiPIDz.getCmd(refangle[path_num], Posiz, 1.57);//角速度に対してrefvelは遅すぎるから　refvel[path_num]);//(0.0, gPosiz, refvel[phase]);
 
