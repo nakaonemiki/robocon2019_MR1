@@ -9,11 +9,18 @@
 //#define FOLLOW_ICHIPID  ( 2 )
 #define POSITION_PID    ( 2 )
 
+#define MODE_START  ( 0 )
+#define MODE_NORMAL ( 1 )
+#define MODE_STOP   ( 2 )
+#define MODE_START_STOP   ( 3 )
+
 class MotionGenerator{
 public:
     /*********** 変数宣言 ***********/
     double Px[POINTNUM], Py[POINTNUM];
     double refangle[PATHNUM], refvel[PATHNUM];
+    int acc_mode[PATHNUM], acc_count[PATHNUM];
+    double dec_tbe[PATHNUM];
 
     // ベジエ曲線関連
     double Ax[ PATHNUM ];

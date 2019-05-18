@@ -15,6 +15,15 @@
 
 #define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
 
+// 上半身との通信
+#define BIT_START   ( 0b10010000 ) // 0x90:最初に送る
+#define BIT_INIT    ( 0b10001000 )// 
+#define BIT_DOWN    ( 0b10001001 )// シャガイを取るモード
+#define BIT_ROT     ( 0b10001101 )// ローラ回転
+#define BIT_DEP     ( 0b10100000 )// ゲルゲ展開
+#define BIT_STOR    ( 0b10000001 )// ゲルゲ格納
+#define BIT_EXT     ( 0b10001110 )// シャガイを投げる
+
 // VL53L0X
 #define SENSOR_NUM  4 // 使用するセンサーの数
 #define ADDRESS_DEFALUT 0b0101001 // 0x29

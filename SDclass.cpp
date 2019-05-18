@@ -65,14 +65,14 @@ int mySDclass::write_logdata(String dataString){
   }
 }
 
-int mySDclass::path_read(int field, double Px[], double Py[], double vel[], double angle[]){
+int mySDclass::path_read(int field, double Px[], double Py[], double vel[], double angle[], int mode[], int count[], double tbe[]){
   File myFile;
   char *pathFile;
   char *velFile;
   char tmpchar;
-  char tmpA[10], tmpB[10], tmpC[10], tmpD[10];
+  char tmpA[10], tmpB[10], tmpC[10], tmpD[10], tmpE[10];
   bool file_end  = false;
-  int numx = 0, numy = 0, numv = 0, numa = 0;
+  int numa = 0, numb = 0, numc = 0, numd = 0, nume = 0;
   int path_num = 0, point_num = 0;
 
   // 赤か青かで読み込むファイルを変更する
@@ -92,18 +92,18 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
     // read from the file until there's nothing else in it:
     while (!file_end && myFile.available()) {
       while((tmpchar = myFile.read()) != ','){ // カンマが来るまで繰り返し
-        tmpA[numx] = tmpchar; // 文字列に1文字ずつ格納していく
-        numx++;
+        tmpA[numa] = tmpchar; // 文字列に1文字ずつ格納していく
+        numa++;
       }
-      *Px = str2double(tmpA, numx); //関数でdoubleに変換
+      *Px = str2double(tmpA, numa); //関数でdoubleに変換
       //Serial.print(tmpA);
       Serial.print(*Px);
       for(int i = 0; i < 10; i++) tmpA[i] = 0; // 文字列を初期化
-      numx=0;
+      numa=0;
       Px++;
       while(((tmpchar = myFile.read()) != '\r' && tmpchar != ';') && tmpchar != '/'){ // 改行コードかセミコロン，スラッシュが来るまで繰り返し
-        tmpB[numy] = tmpchar;
-        numy++;
+        tmpB[numb] = tmpchar;
+        numb++;
       }
       if(tmpchar == ';'){
         file_end = true;
@@ -112,14 +112,14 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
       }else{
         myFile.read(); // "\n"を捨てるため
       }
-      *Py = str2double(tmpB, numy); //関数でdoubleに変換
+      *Py = str2double(tmpB, numb); //関数でdoubleに変換
       point_num++;
 
       Serial.print(",");
       Serial.println(*Py);
       //Serial.println(tmpB);
       for(int i = 0; i < 10; i++) tmpB[i] = 0;
-      numy = 0;
+      numb = 0;
       Py++;
     }
     //Serial.print("path done! ");
@@ -137,33 +137,70 @@ int mySDclass::path_read(int field, double Px[], double Py[], double vel[], doub
   if (myFile) {
     while (!file_end && myFile.available()) {
       while((tmpchar = myFile.read()) != ','){
-        tmpC[numv] = tmpchar;
-        numv++;
+        tmpA[numa] = tmpchar;
+        numa++;
       }
-      *vel = str2double(tmpC, numv); //関数でdoubleに変換
+      *vel = str2double(tmpA, numa); //関数でdoubleに変換
       //Serial.print(tmpA);
       Serial.print(*vel);
-      for(int i = 0; i < 10; i++) tmpC[i] = 0;
-      numv = 0;
+      for(int i = 0; i < 10; i++) tmpA[i] = 0;
+      numa = 0;
       vel++;
+      //////////////////////////////////
+      while((tmpchar = myFile.read()) != ','){
+        tmpB[numb] = tmpchar;
+        numb++;
+      }
+      *angle = str2double(tmpB, numb); //関数でdoubleに変換
+      //Serial.print(tmpA);
+      Serial.print(",");
+      Serial.print(*angle);
+      for(int i = 0; i < 10; i++) tmpB[i] = 0;
+      numb = 0;
+      angle++;
+      //////////////////////////////////
+      while((tmpchar = myFile.read()) != ','){
+        tmpC[numc] = tmpchar;
+        numc++;
+      }
+      *mode = str2uint(tmpC, numc); //関数でdoubleに変換
+      //Serial.print(tmpA);
+      Serial.print(",");
+      Serial.print(*mode);
+      for(int i = 0; i < 10; i++) tmpC[i] = 0;
+      numc = 0;
+      mode++;
+      //////////////////////////////////
+      while((tmpchar = myFile.read()) != ','){
+        tmpD[numd] = tmpchar;
+        numd++;
+      }
+      *count = str2uint(tmpD, numd); //関数でdoubleに変換
+      //Serial.print(tmpA);
+      Serial.print(",");
+      Serial.print(*count);
+      for(int i = 0; i < 10; i++) tmpD[i] = 0;
+      numd = 0;
+      count++;
+      //////////////////////////////////
       while((tmpchar = myFile.read()) != '\r' && tmpchar != ';'){
-        tmpD[numa] = tmpchar;
-        numa++;
+        tmpE[nume] = tmpchar;
+        nume++;
       }
       if(tmpchar == ';'){
         file_end = true;
       }else{
         myFile.read(); // "\n"を捨てるため
       }
-      *angle = str2double(tmpD, numa); //関数でdoubleに変換
+      *tbe = str2double(tmpE, nume); //関数でdoubleに変換
       path_num++;
 
       //Serial.print(tmpB);
       Serial.print(",");
-      Serial.println(*angle);
-      for(int i = 0; i < 10; i++) tmpD[i] = 0;
-      numa = 0;
-      angle++;
+      Serial.println(*tbe);
+      for(int i = 0; i < 10; i++) tmpE[i] = 0;
+      nume = 0;
+      tbe++;
     }
     //Serial.println("vel/angle done!");
     // close the file:
@@ -214,5 +251,20 @@ double mySDclass::str2double(char* str, int num){
     }
   }
   if(minus) return -1.0 * ret;
+  return ret;
+}
+
+int mySDclass::str2uint(char* str, int num){
+  num--;
+  int ret = 0;
+  //bool minus = false;
+  
+  // 整数部を変換
+  for(int i = 0; i <= num; i++){
+    if(str[i] >= 48 && str[i] <= 57){
+      ret += (double)(str[i] - 48) * pow(10.0, num - i);
+    }
+  }
+  
   return ret;
 }

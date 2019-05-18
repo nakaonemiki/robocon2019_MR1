@@ -115,6 +115,8 @@ int *pdata5 = data5;
 int *pdata6 = data6;
 int *pdata7 = data7;
 
+char cmd = 0b00000000;
+
 /* double Kakudoxl, Kakudoxr, Kakudoy, tmpKakudoy;
 double Posix, Posiy, Posiz; */
 double tmpPosix = 0.0, tmpPosiy = 0.0, tmpPosiz = 0.0;
@@ -285,6 +287,8 @@ void setup() {
 
 	// PCと通信
 	Serial.begin(230400);
+	// mbedと通信
+	Serial1.begin(115200);
 	
 	if(lpms.init() == 0){
 		digitalWrite(PIN_LED3, HIGH);
@@ -322,13 +326,13 @@ void setup() {
 	int actpathnum;
 	if( !digitalRead(51) ){	// 赤
 		digitalWrite(PIN_RED, HIGH);
-		actpathnum = mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle);
+		actpathnum = mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle, motion.acc_mode, motion.acc_count, motion.dec_tbe);
 		Serial.println(actpathnum);
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
 		zone = RED;
 	}else{					// 青
 		digitalWrite(PIN_BLUE, HIGH);
-		actpathnum = mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle);
+		actpathnum = mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle, motion.acc_mode, motion.acc_count, motion.dec_tbe);
 		Serial.print("path num: ");
 		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
@@ -347,6 +351,11 @@ void setup() {
 	gPosiy = motion.Py[0];
 	gPosiz = 0.785398;//1.5708;//0;
 
+	cmd = BIT_START;
+	Serial1.print('L');
+	Serial1.print(cmd); // 初期化
+	Serial1.print('\n');
+
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
 	MsTimerTPU3::set((int)(INT_TIME * 1000), timer_warikomi); // 10ms period
@@ -363,12 +372,12 @@ void setup() {
 /* void reboot_function(){
 	system_reboot(REBOOT_USERAPP);
 } */
-
+double refVx, refVy, refVz;
 
 void loop() {
 	//static int dataCount = 0;
 
-	double refVx, refVy, refVz;
+	
 	int syusoku;
 	static int wait_count = 0;
 	static bool pre_buttonstate = 1;
@@ -379,42 +388,7 @@ void loop() {
 	(PIN_SW) ){
 		reboot_function();
 	} */
-	if( flag_20ms ){
-		/* static int count_sens = 0;
-		sensVal[count_sens] = gSensor[count_sens].readRangeSingleMillimeters();
-		Serial.print(sensVal[count_sens]);
-		Serial.print("\t");
-		count_sens++;
-		if(count_sens == SENSOR_NUM){
-			count_sens = 0;
-			Serial.println();
-		} */
-
-		/* for(int n = 0; n < SENSOR_NUM; n++){
-			sensVal[n] = gSensor[n].readRangeSingleMillimeters();
-			Serial.print(sensVal[n]);
-			Serial.print("\t");
-		}
-		Serial.println(); */
-		
-		/*** SDカード利用のために追加　2019/05/05 ***/
-		String dataString = "";
-		static bool first_write = true;
-		if(first_write){
-			dataString += "phase,path_num,onx,ony,gPosix,gPosiy,gPosiz,angle,dist,refKakudo";
-			mySD.write_logdata(dataString);
-			first_write = false;
-			dataString = "";
-		}
-		dataString += String(phase) + "," + String(motion.getPathNum()) + "," + String(motion.onx, 4) + "," + String(motion.ony, 4);
-		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
-		dataString += "," + String(motion.angle, 4)  + "," + String(motion.dist, 4) + "," + String(motion.refKakudo, 4);
-		
-		mySD.write_logdata(dataString);
-		/*** SDカード利用のために追加　2019/05/05 ***/
-	}
-
-	flag_20ms = false;
+	
 
 	if( flag_10ms ){
 		int pathNum = motion.getPathNum();
@@ -425,14 +399,29 @@ void loop() {
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 1;
 			}
 		///// phase 1 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 1){ // ゲルゲ受け渡しまで
+			// ----------------------------------上半身との通信----------------------------------
+			if( pathNum == 8 ){
+				cmd = BIT_DEP;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}else if( pathNum == 10 ){
+				cmd = BIT_STOR;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+			// ----------------------------------上半身との通信----------------------------------
+
 			if(motion.getMode() != FOLLOW_TANGENT) motion.setMode(FOLLOW_TANGENT); // 接線方向を向くモードになっていなかったら変更
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			
 			if(syusoku == 1){
 				if( pathNum <= STATE1 ){
 					motion.Px[3*pathNum+3] = gPosix;
@@ -453,12 +442,16 @@ void loop() {
 			
 		///// phase 2 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 2){ // じわじわ動いて位置補正
-			digitalWrite(PIN_LED2, HIGH);
+			
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				//gPosix = 6.075;
+				//gPosiy = 8.225;
+				//motion.Px[3*pathNum+3] = gPosix;
+				//motion.Py[3*pathNum+3] = gPosiy;
 				motion.incrPathnum(0.02, 0.997);
 				phase = 3;
 			}
@@ -532,7 +525,6 @@ void loop() {
 		}
 		///// phase 3 /////////////////////////////////////////////////////////////////////////
 		else if(phase == 3){ // 位置制御で壁から離れる
-			digitalWrite(PIN_LED1, HIGH);
 			if(motion.getMode() != POSITION_PID) motion.setMode(POSITION_PID);
 
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
@@ -575,6 +567,13 @@ void loop() {
 			}
 		///// phase 5 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 5){ // シャガイの前まで移動
+			if( pathNum == 14 ){
+				cmd = BIT_DOWN;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
@@ -601,7 +600,7 @@ void loop() {
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 7;
 			}			
 		///// phase 7 /////////////////////////////////////////////////////////////////////////	
@@ -628,15 +627,22 @@ void loop() {
 			}
 		///// phase 8 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 8){ // シャガイの前で待機(ここでシャガイを取得する一連の動作を行う)
+
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 9;
 			}			
 		///// phase 9 /////////////////////////////////////////////////////////////////////////	
 		}else if(phase == 9){ // 投擲位置まで移動
+			if( pathNum == 17 ){
+				cmd = BIT_ROT;
+				Serial1.print('L');
+				Serial1.print(cmd); // 投げる
+				Serial1.print('\n');
+			}
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
@@ -646,7 +652,7 @@ void loop() {
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
-					if( pathNum == STATE4 ) phase = 9;
+					if( pathNum == STATE4 ) phase = 10;
 				}
 			}else if(syusoku == 0){ // 0の時は問題がないとき
 				refVx = motion.refVx;
@@ -659,12 +665,20 @@ void loop() {
 			}
 		///// phase 10 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 10){ // 投擲位置で待機(ここで投げる動作をする)
+			wait_count++;
+			if(wait_count > 100){
+				cmd = BIT_EXT;
+				Serial1.print('L');
+				Serial1.print(cmd); // 投げる
+				Serial1.print('\n');
+			}
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
-				phase = 11;
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				//phase = 11;
+				wait_count = 0;
 			}			
 		///// phase 11 /////////////////////////////////////////////////////////////////////////	
 		}else if(phase == 11){ // 2個目のシャガイの位置まで移動
@@ -672,7 +686,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE5 ){
+				if( pathNum <= STATE5 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -694,7 +708,7 @@ void loop() {
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 13;
 			}			
 		///// phase 13 /////////////////////////////////////////////////////////////////////////	
@@ -703,7 +717,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE6 ){
+				if( pathNum <= STATE6 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -725,7 +739,7 @@ void loop() {
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 15;
 			}			
 		///// phase 15 /////////////////////////////////////////////////////////////////////////	
@@ -734,7 +748,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE7 ){
+				if( pathNum <= STATE7 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -756,7 +770,7 @@ void loop() {
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0 && digitalRead(A5) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 17;
 			}			
 		///// phase 17 /////////////////////////////////////////////////////////////////////////	
@@ -765,7 +779,7 @@ void loop() {
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
-				if( pathNum < STATE8 ){
+				if( pathNum <= STATE8 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
@@ -1005,15 +1019,61 @@ void loop() {
 		Serial.print(); */
 
 		
-		Serial.print(phase);
+		/* Serial.print(phase);
 		Serial.print("\t");
 		Serial.print(refVx);
 		Serial.print("\t");
 		Serial.print(refVy);
 		Serial.print("\t");
-		Serial.println(swState, BIN);
+		Serial.println(swState, BIN); */
+		/* Serial.print(gPosix, 4);
+		Serial.print("\t");
+		Serial.print(gPosiy, 4);
+		Serial.print("\t");
+		Serial.println(motion.calcRefvel(gPosix, gPosiy, gPosiz)); */
+		Serial.println(motion.getMode());
 
-		pre_buttonstate = digitalRead(PIN_BUTTON1);
+		pre_buttonstate = digitalRead(A5);
 		flag_10ms = false;
 	}
+
+	if( flag_20ms ){
+		/* static int count_sens = 0;
+		sensVal[count_sens] = gSensor[count_sens].readRangeSingleMillimeters();
+		Serial.print(sensVal[count_sens]);
+		Serial.print("\t");
+		count_sens++;
+		if(count_sens == SENSOR_NUM){
+			count_sens = 0;
+			Serial.println();
+		} */
+
+		/* for(int n = 0; n < SENSOR_NUM; n++){
+			sensVal[n] = gSensor[n].readRangeSingleMillimeters();
+			Serial.print(sensVal[n]);
+			Serial.print("\t");
+		}
+		Serial.println(); */
+		
+		/*** SDカード利用のために追加　2019/05/05 ***/
+		String dataString = "";
+		static bool first_write = true;
+		if(first_write){
+			dataString += "phase,path_num,onx,ony,gPosix,gPosiy,gPosiz,angle,dist,refKakudo,refVx,refVy,refVz";
+			mySD.write_logdata(dataString);
+			first_write = false;
+			dataString = "";
+		}
+		dataString += String(phase) + "," + String(motion.getPathNum()) + "," + String(motion.onx, 4) + "," + String(motion.ony, 4);
+		dataString += "," + String(gPosix, 4) + "," + String(gPosiy, 4) + "," + String(gPosiz, 4);
+		dataString += "," + String(motion.angle, 4)  + "," + String(motion.dist, 4) + "," + String(motion.refKakudo, 4);
+		dataString += "," + String(refVx, 4) + "," + String(refVy, 4) + "," + String(refVz, 4);
+		
+		mySD.write_logdata(dataString);
+		/*** SDカード利用のために追加　2019/05/05 ***/
+
+		flag_20ms = false;
+	}
+
+	
 }

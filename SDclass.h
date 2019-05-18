@@ -16,7 +16,8 @@ public:
     int make_logfile();
     int write_logdata(String);
 
-    int path_read(int, double*, double*, double*, double*);
+    int path_read(int, double*, double*, double*, double*, int*, int*, double*);
 
     double str2double(char*, int);
+    int str2uint(char* str, int num);
 };
