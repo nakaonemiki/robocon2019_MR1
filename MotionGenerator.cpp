@@ -12,7 +12,7 @@ PID posiPIDx(5.0, 0.0, 0.0, INT_TIME);
 PID posiPIDy(4.0, 0.0, 0.0, INT_TIME);
 PID posiPIDz(5.0, 0.0, 0.0, INT_TIME);
 
-PID yokozurePID(3.0, 0.0, 0.0, INT_TIME);
+PID yokozurePID(3.0, 0.0, 0.0, INT_TIME);//(3.0, 0.0, 0.0, INT_TIME);
 PID kakudoPID(3.0, 0.0, 0.0, INT_TIME);
 
 // 二次遅れ使えるようになる
@@ -153,14 +153,14 @@ int MotionGenerator::calcRefvel(double Posix, double Posiy, double Posiz){
                     refVtan = refvel[path_num] * counter/(double)acc_count[path_num];
                 }else if(t_be < dec_tbe[path_num]){
                     refVtan = refvel[path_num];
-                }else if((acc_mode[path_num] == MODE_STOP || acc_mode[path_num] == MODE_START_STOP) && t_be >= 0.8){
+                }else if((acc_mode[path_num] == MODE_STOP || acc_mode[path_num] == MODE_START_STOP) && t_be >= dec_tbe[path_num]){
                     refVtan = refvel[path_num] - refvel[path_num] * (t_be - dec_tbe[path_num]) / (1.0 - dec_tbe[path_num]);
                 }else if(t_be >= dec_tbe[path_num]){
                     refVtan = refvel[path_num] - (refvel[path_num] - refvel[path_num + 1]) * (t_be - dec_tbe[path_num]) / (1.0 - dec_tbe[path_num]);
                 }
 
                 //refVtan = sokduo_filter.SecondOrderLag(refvel[path_num]); // 接線方向速度
-                refVper = yokozurePID.getCmd(dist, 0.0, refvel[path_num]); // 横方向速度
+                refVper = yokozurePID.getCmd(dist, 0.0, refvel[path_num] * 2.0); // 横方向速度
 
                 // 旋回は以下の2種類を mode によって変える
                 if(mode == FOLLOW_TANGENT){

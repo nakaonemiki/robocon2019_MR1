@@ -23,6 +23,9 @@
 #define BIT_DEP     ( 0b10100000 )// ゲルゲ展開
 #define BIT_STOR    ( 0b10000001 )// ゲルゲ格納
 #define BIT_EXT     ( 0b10001110 )// シャガイを投げる
+#define BIT_0       ( 0b00000000 )
+
+#define MASK_SHAGAIARM  ( 0b00010000 )// シャガイハンド上下のマスク
 
 // VL53L0X
 #define SENSOR_NUM  4 // 使用するセンサーの数
