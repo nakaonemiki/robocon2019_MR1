@@ -434,12 +434,12 @@ void loop() {
 		///// phase 1 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 1){ // ゲルゲ受け渡しまで
 			// ----------------------------------上半身との通信----------------------------------
-			if( pathNum == 8 ){
+			if( pathNum == 8 && cmd != BIT_DEP ){
 				cmd = BIT_DEP;
 				Serial1.print('L');
 				Serial1.print(cmd); // ゲルゲ展開
 				Serial1.print('\n');
-			}else if( pathNum == 10 ){
+			}else if( pathNum == 10 && cmd != BIT_STOR ){
 				cmd = BIT_STOR;
 				Serial1.print('L');
 				Serial1.print(cmd); // ゲルゲ展開
@@ -596,7 +596,7 @@ void loop() {
 			}
 		///// phase 5 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 5){ // シャガイの前まで移動
-			if( pathNum == 14 ){
+			if( pathNum == 14 && cmd != BIT_DOWN ){
 				cmd = BIT_DOWN;
 				Serial1.print('L');
 				Serial1.print(cmd); // シャガイを取るモード
@@ -677,12 +677,13 @@ void loop() {
 			}			
 		///// phase 9 /////////////////////////////////////////////////////////////////////////	
 		}else if(phase == 9){ // 投擲位置まで移動
-			//if( pathNum == 17 ){
+			if( cmd != BIT_ROT ){
 				cmd = BIT_ROT;
 				Serial1.print('L');
 				Serial1.print(cmd); // 投げる
 				Serial1.print('\n');
-			//}
+			}
+			
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
@@ -705,29 +706,43 @@ void loop() {
 			}
 		///// phase 10 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 10){ // 投擲位置で待機(ここで投げる動作をする)
-			wait_count++;
-			if(wait_count == 1){
-				cmd = BIT_EXT;
-				Serial1.print('L');
-				Serial1.print(cmd); // 投げる
-				Serial1.print('\n');
-			}else if(wait_count > 180){
-				cmd = BIT_DOWN;
-				Serial1.print('L');
-				Serial1.print(cmd); // ハンド下げる
-				Serial1.print('\n');
-			}
 			// refVx = 0.0;
 			// refVy = 0.0;
 			// refVz = 0.0;
 			if(motion.getMode() != POSITION_PID) motion.setMode(POSITION_PID);
 
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+
 			if(syusoku == 1){
 				//digitalWrite(PIN_LED2, HIGH);
 				//motion.Px[3*pathNum+3] = gPosix;
 				//motion.Py[3*pathNum+3] = gPosiy;
-				motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+				// 収束した位置にとどめるために速度をゼロにする
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+
+				//wait_count++;
+				if(/*wait_count >= 10 && */cmd != BIT_EXT){
+					cmd = BIT_EXT;
+					Serial1.print('L');
+					Serial1.print(cmd); // 投げる
+					Serial1.print('\n');
+				}
+
+				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
+				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+					// ボタンを押したら投擲を終了して，次のフェーズへ
+					cmd = BIT_DOWN;
+					Serial1.print('L');
+					Serial1.print(cmd); // ハンド下げる
+					Serial1.print('\n');
+					//phase = 11;
+					wait_count = 0;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+				}
+				
 			}else if(syusoku == 0){ // 0の時は問題がないとき
 				refVx = motion.refVx;
 				refVy = motion.refVy;
@@ -736,11 +751,6 @@ void loop() {
 				refVx = 0.0;
 				refVy = 0.0;
 				refVz = 0.0;
-			}
-
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
-				//phase = 11;
-				wait_count = 0;
 			}			
 		///// phase 11 /////////////////////////////////////////////////////////////////////////	
 		}else if(phase == 11){ // 2個目のシャガイの位置まで移動
