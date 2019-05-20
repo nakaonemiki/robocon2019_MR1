@@ -8,10 +8,10 @@
 #define STATE2      ( 14 )// ゲルゲ受け渡し後からシャガイ取得まで
 #define STATE3      ( 15 )// シャガイ取得後からスローイングゾーン待機まで
 #define STATE4      ( 17 )// 投擲位置まで移動
-#define STATE5      ( 19 )// 2個目のシャガイまで
-#define STATE6      ( 21 )// シャガイ取得後からスローイングゾーン待機まで
-#define STATE7      ( 23 )// 3個目のシャガイまで
-#define STATE8      ( 25 )// シャガイ取得後からスローイングゾーン待機まで
+#define STATE5      ( 20 )//( 19 )// 2個目のシャガイまで
+#define STATE6      ( 22 )//( 21 )// シャガイ取得後からスローイングゾーン待機まで
+#define STATE7      ( 25 )//( 23 )// 3個目のシャガイまで
+#define STATE8      ( 27 )//( 25 )// シャガイ取得後からスローイングゾーン待機まで
 
 #define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
 

@@ -12,6 +12,8 @@ lpms_me1::lpms_me1(HardwareSerial* xserial){
   pre_rawanglex = 0.0;
   pre_rawangley = 0.0;
   pre_rawanglez = 0.0;
+
+  init_ignore = true;
 }
 
 // コマンドモードへの移行
@@ -138,7 +140,12 @@ float lpms_me1::get_z_angle(){
       rawanglez *= -1.0f;
     }
 
-    float diff_rawanglez = rawanglez - pre_rawanglez;
+    float diff_rawanglez;
+    if(init_ignore) {
+      diff_rawanglez = 0.0;
+    }else{
+      diff_rawanglez = rawanglez - pre_rawanglez;
+    }
     if(fabs(diff_rawanglez) >= 3.0){
       if(rawanglez < 0){ //+から-へ回ったとき
         anglez += PIx2 + diff_rawanglez;
@@ -295,6 +302,12 @@ int lpms_me1::init(){
     result[3] = recv_proc(500);
     //Serial.println(result[3]);
   }while(result[3] != 0);
+
+  for(int i = 0; i < 5; i++){
+    get_z_angle();
+    delay(10);
+  }
+  init_ignore = false;
 
   //if(result[0] >= 0 && result[1] >= 0) digitalWrite(PIN_LED3, HIGH);
   //if(result[2] >= 0 && result[3] >= 0) digitalWrite(PIN_LED2, HIGH);

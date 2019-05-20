@@ -19,4 +19,5 @@ class lpms_me1{
     byte buffer[25];
     float anglex, angley, anglez;
     float pre_rawanglex, pre_rawangley, pre_rawanglez;
+    bool init_ignore;
 };
