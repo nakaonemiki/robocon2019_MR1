@@ -23,6 +23,14 @@
 #define PIN_BUTTON1 (49)
 #define PIN_BUTTON2 (50)
 
+#define PIN_BUTTON_NORMAL (10)
+#define PIN_BUTTON_RETRY1 (11)
+#define PIN_BUTTON_RETRY2 (12)
+#define PIN_EXBUTTON1 (13)
+
+#define PIN_EXLED1 (22)
+#define PIN_EXLED2 (23)
+
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
 phaseCounter Enc2(2);
@@ -55,8 +63,8 @@ boolean flag_10ms = false;
 boolean flag_20ms = false;
 boolean flag_5s = false;
 
-// 赤か青か
-int zone;
+int zone; // 赤か青か
+int retry_num = 0; // リトライモード 0:通常，1:リトライ1，2:リトライ2
 
 // phase で動作フェーズを管理
 int phase = 0;
@@ -98,6 +106,10 @@ int phase = 0;
 //    【フェーズ移行条件】：path_num が所定の数値になったら
 //(18): シャガイを投げる位置で待機するフェーズ（位置制御）
 //    【フェーズ移行条件】：スイッチを押されたら
+//(100): リトライ（スタート待機）
+//    【フェーズ移行条件】：スイッチが押されたら phase -> 101 へ
+//(101): リトライ（直進後にじわじわ動いて位置補正-->シャガイ取得・投擲）
+//    【フェーズ移行条件】：一定距離進んだら phae -> 2 へ
 
 int data1[ 1300 ];//[ 12000 ];
 int data2[ 1300 ];
@@ -150,8 +162,10 @@ void timer_warikomi(){
 	if(ledcount >= 25) {
 		if(digitalRead(PIN_LED0) == LOW){
 			digitalWrite(PIN_LED0, HIGH);
+			digitalWrite(PIN_EXLED2, LOW);
 		} else {
 			digitalWrite(PIN_LED0, LOW);
+			digitalWrite(PIN_EXLED2, HIGH);
 		}
 		ledcount = 0;
 	}
@@ -276,6 +290,14 @@ void setup() {
 	pinMode(A4, INPUT);
 	pinMode(A5, INPUT);
 
+	pinMode(PIN_BUTTON_NORMAL, INPUT);
+	pinMode(PIN_BUTTON_RETRY1, INPUT);
+	pinMode(PIN_BUTTON_RETRY2, INPUT);
+	pinMode(PIN_EXBUTTON1, INPUT);
+
+	pinMode(PIN_EXLED1, OUTPUT);
+	pinMode(PIN_EXLED2, OUTPUT);
+
 	pinMode(49, INPUT);
 	pinMode(50, INPUT);
 	pinMode(51, INPUT);
@@ -322,13 +344,37 @@ void setup() {
 	mySD.init();
 	Serial.print("Path reading ...");
 	
-	while( digitalRead(PIN_BUTTON1) && digitalRead(PIN_BUTTON2) );
+	int button_state = 0;
+	do{
+		button_state |= digitalRead(PIN_BUTTON_NORMAL);
+		button_state |= digitalRead(PIN_BUTTON_RETRY1)<<1;
+		button_state |= digitalRead(PIN_BUTTON_RETRY2)<<2;
+	}while( button_state == 7 ); // どのボタンも押されていない限り続ける
+	
 	int actpathnum;
 	if( !digitalRead(51) ){	// 赤
 		digitalWrite(PIN_RED, HIGH);
 		actpathnum = mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle, motion.acc_mode, motion.acc_count, motion.dec_tbe);
 		Serial.println(actpathnum);
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
+
+		if(button_state & 0x01 == 0x01){
+			// 通常スタート
+			retry_num = 10;
+			gPosiz = 2.35619449;
+			phase = 0;
+		}else if(button_state & 0x02 == 0x02){
+			// リトライ1
+			retry_num = 11;
+			gPosiz = 3.14159265;
+			phase = 100;
+		}else if(button_state & 0x04 == 0x04){
+			// リトライ2
+			retry_num = 12;
+			gPosiz = 3.14159265;
+			phase = 100;
+		}
+
 		zone = RED;
 	}else{					// 青
 		digitalWrite(PIN_BLUE, HIGH);
@@ -336,8 +382,33 @@ void setup() {
 		Serial.print("path num: ");
 		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
+
+		if(button_state & 0x01 == 0x01){
+			// 通常スタート
+			retry_num = 0;
+			gPosiz = 0.785398;//1.5708;//0;
+			phase = 0;
+		}else if(button_state & 0x02 == 0x02){
+			// リトライ1
+			retry_num = 1;
+			gPosiz = 0.0;
+			phase = 100;
+		}else if(button_state & 0x04 == 0x04){
+			// リトライ2
+			retry_num = 2;
+			gPosiz = 0.0;
+			phase = 100;
+		}
+
 		zone = BLUE;
 	}
+	if(actpathnum >= 0){
+		digitalWrite(PIN_EXLED1, HIGH); // 読み込みが完了したらLED点灯
+	}
+
+	gPosix = motion.Px[0];
+	gPosiy = motion.Py[0];
+
 
 	Serial.println(motion.Px[0]);
 	mySD.make_logfile();
@@ -346,10 +417,6 @@ void setup() {
 	motion.initSettings(); // これをやっていないと足回りの指令速度生成しない
 	motion.setConvPara(0.02, 0.997); // 初期化
 	motion.setMaxPathnum(actpathnum); // パス数の最大値
-
-	gPosix = motion.Px[0];
-	gPosiy = motion.Py[0];
-	gPosiz = 0.785398;//1.5708;//0;
 
 	cmd = BIT_START;
 	Serial1.print('L');
@@ -1000,7 +1067,34 @@ void loop() {
 				refVx = 0.0;
 				refVy = 0.0;
 				refVz = 0.0;
-			}			
+			}
+		
+		///// phase 100  リトライ用　 /////////////////////////////////////////////////////////////////////////			
+		}else if(phase == 100){ // リスタート位置(線をまたいだ位置)で待機
+			refVx = 0.0;
+			refVy = 0.0;
+			refVz = 0.0;
+			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				phase = 101;
+			}
+		///// phase 101  リトライ用　 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 101){ // 投擲位置まで移動
+			if(retry_num == 1 || retry_num == 2){
+				refVx = 0.5; // とりあえずまっすぐ進むだけ
+				refVy = 0.0;
+				refVz = 0.0;
+				if(gPosix >= 2.0){
+					phase = 2;
+				}
+			}else if(retry_num == 11 || retry_num == 12){
+				refVx = -0.5; // とりあえずまっすぐ進むだけ
+				refVy = 0.0;
+				refVz = 0.0;
+				if(gPosix <= -2.0){
+					phase = 2;
+				}
+			}
+			
 		}
 
 		// // ベジエ曲線
