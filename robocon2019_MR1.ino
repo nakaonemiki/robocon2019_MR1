@@ -23,13 +23,13 @@
 #define PIN_BUTTON1 (49)
 #define PIN_BUTTON2 (50)
 
-#define PIN_BUTTON_NORMAL (10)
-#define PIN_BUTTON_RETRY1 (11)
-#define PIN_BUTTON_RETRY2 (12)
-#define PIN_EXBUTTON1 (13)
+#define PIN_BUTTON_NORMAL (44)
+#define PIN_BUTTON_RETRY1 (47)
+#define PIN_BUTTON_RETRY2 (46)
+#define PIN_EXBUTTON1 (45)
 
-#define PIN_EXLED1 (22)
-#define PIN_EXLED2 (23)
+#define PIN_EXLED1 (25)
+#define PIN_EXLED2 (27)
 
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
