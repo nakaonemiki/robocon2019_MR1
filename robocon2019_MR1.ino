@@ -344,13 +344,19 @@ void setup() {
 	mySD.init();
 	Serial.print("Path reading ...");
 	
-	int button_state = 0;
-	do{
+	int button_state;
+	/*do{
+		button_state = 0;
 		button_state |= digitalRead(PIN_BUTTON_NORMAL);
 		button_state |= digitalRead(PIN_BUTTON_RETRY1)<<1;
 		button_state |= digitalRead(PIN_BUTTON_RETRY2)<<2;
-	}while( button_state == 7 ); // どのボタンも押されていない限り続ける
-	
+	}while( button_state & 0x07 == 0x07 ); // どのボタンも押されていない限り続ける*/ // これは拡張基板付けたら入れる
+
+	do{
+		button_state = 0;
+		button_state |= digitalRead(PIN_BUTTON1)
+	}while (button_state == 0x01); // この処理は，拡張基板付けたら消す
+
 	int actpathnum;
 	if( !digitalRead(51) ){	// 赤
 		digitalWrite(PIN_RED, HIGH);
@@ -358,17 +364,17 @@ void setup() {
 		Serial.println(actpathnum);
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
 
-		if(button_state & 0x01 == 0x01){
+		if(button_state & 0x01 == 0x00){
 			// 通常スタート
 			retry_num = 10;
 			gPosiz = 2.35619449;
 			phase = 0;
-		}else if(button_state & 0x02 == 0x02){
+		}else if(button_state & 0x02 == 0x00){
 			// リトライ1
 			retry_num = 11;
 			gPosiz = 3.14159265;
 			phase = 100;
-		}else if(button_state & 0x04 == 0x04){
+		}else if(button_state & 0x04 == 0x00){
 			// リトライ2
 			retry_num = 12;
 			gPosiz = 3.14159265;
@@ -383,17 +389,17 @@ void setup() {
 		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
 
-		if(button_state & 0x01 == 0x01){
+		if(button_state & 0x01 == 0x00){
 			// 通常スタート
 			retry_num = 0;
 			gPosiz = 0.785398;//1.5708;//0;
 			phase = 0;
-		}else if(button_state & 0x02 == 0x02){
+		}else if(button_state & 0x02 == 0x00){
 			// リトライ1
 			retry_num = 1;
 			gPosiz = 0.0;
 			phase = 100;
-		}else if(button_state & 0x04 == 0x04){
+		}else if(button_state & 0x04 == 0x00){
 			// リトライ2
 			retry_num = 2;
 			gPosiz = 0.0;
