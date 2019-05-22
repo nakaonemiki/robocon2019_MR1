@@ -58,6 +58,7 @@ int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
 boolean stopRoller = false;
+int swTiming = 0;
 
 int count_10ms = 0;//0;
 boolean flag_10ms = false;
@@ -374,13 +375,11 @@ void setup() {
 			// 通常スタート
 			Serial.println("Normal Start at RED zone");
 			retry_num = 10;
-			gPosiz = 2.35619449;
 			phase = 0;
 		}else if((button_state & 0x02)){
 			// リトライ1
 			Serial.println("Re-start at RED zone");
 			retry_num = 11;
-			gPosiz = 3.14159265;
 			phase = 100;
 		}/*else if(button_state & 0x04 == 0x04){
 			// リトライ2
@@ -406,13 +405,11 @@ void setup() {
 			// 通常スタート
 			Serial.println("Normal Start at BLUE zone");
 			retry_num = 0;
-			gPosiz = 0.785398;//1.5708;//0;
 			phase = 0;
 		}else if(button_state & 0x02){
 			// リトライ1
 			Serial.println("Re-start at BLUE zone");
 			retry_num = 1;
-			gPosiz = 0.0;
 			phase = 100;
 		}/*else if(button_state & 0x04 == 0x04){
 			// リトライ2
@@ -463,7 +460,7 @@ void loop() {
 	
 	int syusoku;
 	static int wait_count = 0;
-	static bool pre_buttonstate = 1;
+	static byte pre_buttonstate = 0;
 	
 	byte swState = 0b00000000;
 
@@ -511,7 +508,16 @@ void loop() {
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				if(retry_num == 10){
+					gPosiz = 2.35619449;
+					gPosix = -0.5;
+					gPosiy =  0.5;
+				}else if(retry_num == 0){
+					gPosiz = 0.785398;//1.5708;//0;
+					gPosix = 0.5;
+					gPosiy = 0.5;
+				}
 				phase = 1;
 			}
 		///// phase 1 /////////////////////////////////////////////////////////////////////////
@@ -718,11 +724,11 @@ void loop() {
 			refVz = 0.0;
 
 			if( ( MASK_SHAGAIARM & state ) == MASK_SHAGAIARM ){ // シャガイハンドが下がっている
-				digitalWrite(PIN_LED2, LOW);
+				//digitalWrite(PIN_LED2, LOW);
 				if(digitalRead(PIN_BUTTON1) == 0) refVx = 0.1;
 			}else if( ( MASK_SHAGAIARM & state ) == 0b00000000 ){ // シャガイハンドが上がっている
-				digitalWrite(PIN_LED2, HIGH);
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
+				//digitalWrite(PIN_LED2, HIGH);
+				if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
 					phase = 7;
 				}
 			}	
@@ -755,7 +761,7 @@ void loop() {
 			refVy = 0.0;
 			refVz = 0.0;
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 9;
 			}			
 		///// phase 9 /////////////////////////////////////////////////////////////////////////	
@@ -806,29 +812,42 @@ void loop() {
 				refVy = 0.0;
 				refVz = 0.0;
 
-				wait_count++;
-				if(wait_count == 5 && cmd != BIT_EXT){
-					cmd = BIT_EXT;
-					Serial1.print('L');
-					Serial1.print(cmd); // 投げる
-					Serial1.print('\n');
-				}
+				// wait_count++;
+				//if(wait_count == 5 && cmd != BIT_EXT){
+					// cmd = BIT_EXT;
+					// Serial1.print('L');
+					// Serial1.print(cmd); // 投げる
+					// Serial1.print('\n');
+				//}
 
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+					digitalWrite(PIN_LED2, HIGH);
 					// ボタンを押したら投擲を終了して，次のフェーズへ
-					if( !stopRoller ){		// スイッチを最初に押したとき
+					if( swTiming == 0 ){
+						digitalWrite(PIN_LED1, HIGH);
+						if(cmd != BIT_EXT){
+							cmd = BIT_EXT;
+							Serial1.print('L');
+							Serial1.print(cmd); // 投げる
+							Serial1.print('\n');
+							swTiming++;
+						}
+					}else if( swTiming == 1 ){//if( !stopRoller ){		// スイッチを最初に押したとき
 						stopRoller = true;
-
-						cmd = BIT_DOWN;
-						Serial1.print('L');
-						Serial1.print(cmd); // ハンド下げる
-						Serial1.print('\n');
-						wait_count = 0;
+						if(cmd != BIT_DOWN){
+							cmd = BIT_DOWN;
+							Serial1.print('L');
+							Serial1.print(cmd); // ハンド下げる
+							Serial1.print('\n');
+							wait_count = 0;
+							swTiming++;
+						}
 					}else{					// スイッチをもう一度押したとき
 						stopRoller = false;
 						phase = 11;
 						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+						swTiming = 0;
 					}
 				}
 				
@@ -882,11 +901,11 @@ void loop() {
 			refVz = 0.0;
 
 			if( ( MASK_SHAGAIARM & state ) == MASK_SHAGAIARM ){ // シャガイハンドが下がっている
-				digitalWrite(PIN_LED2, LOW);
+				//digitalWrite(PIN_LED2, LOW);
 				if(digitalRead(PIN_BUTTON1) == 0) refVx = 0.1;
 			}else if( ( MASK_SHAGAIARM & state ) == 0b00000000 ){ // シャガイハンドが上がっている
-				digitalWrite(PIN_LED2, HIGH);
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
+				//digitalWrite(PIN_LED2, HIGH);
+				if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
 					phase = 13;
 				}
 			}
@@ -938,18 +957,24 @@ void loop() {
 				refVy = 0.0;
 				refVz = 0.0;
 
-				wait_count++;
-				if(wait_count >= 5 && cmd != BIT_EXT){
-					cmd = BIT_EXT;
-					Serial1.print('L');
-					Serial1.print(cmd); // 投げる
-					Serial1.print('\n');
-				}
+				// wait_count++;
+				// if(wait_count >= 5 && cmd != BIT_EXT){
+				// 	cmd = BIT_EXT;
+				// 	Serial1.print('L');
+				// 	Serial1.print(cmd); // 投げる
+				// 	Serial1.print('\n');
+				// }
 
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 					// ボタンを押したら投擲を終了して，次のフェーズへ
-					if( !stopRoller ){		// スイッチを最初に押したとき
+					if( swTiming == 0 ){
+						cmd = BIT_EXT;
+						Serial1.print('L');
+						Serial1.print(cmd); // 投げる
+						Serial1.print('\n');
+						swTiming++;
+					}else if( swTiming == 1 ){//if( !stopRoller ){		// スイッチを最初に押したとき
 						stopRoller = true;
 
 						cmd = BIT_DOWN;
@@ -957,10 +982,12 @@ void loop() {
 						Serial1.print(cmd); // ハンド下げる
 						Serial1.print('\n');
 						wait_count = 0;
+						swTiming++;
 					}else{					// スイッチをもう一度押したとき
 						stopRoller = false;
 						phase = 15;
 						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+						swTiming = 0;
 					}
 				}
 				
@@ -1014,11 +1041,11 @@ void loop() {
 			refVz = 0.0;
 
 			if( ( MASK_SHAGAIARM & state ) == MASK_SHAGAIARM ){ // シャガイハンドが下がっている
-				digitalWrite(PIN_LED2, LOW);
+				//digitalWrite(PIN_LED2, LOW);
 				if(digitalRead(PIN_BUTTON1) == 0) refVx = 0.1;
 			}else if( ( MASK_SHAGAIARM & state ) == 0b00000000 ){ // シャガイハンドが上がっている
-				digitalWrite(PIN_LED2, HIGH);
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
+				//digitalWrite(PIN_LED2, HIGH);
+				if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1)){ // スイッチの立ち上がりを検出してフェーズ移行
 					phase = 17;
 				}
 			}
@@ -1067,32 +1094,16 @@ void loop() {
 				refVy = 0.0;
 				refVz = 0.0;
 
-				wait_count++;
-				if(wait_count >= 5 && cmd != BIT_EXT){
-					cmd = BIT_EXT;
-					Serial1.print('L');
-					Serial1.print(cmd); // 投げる
-					Serial1.print('\n');
-				}
+				// wait_count++;
+				// if(wait_count >= 5 && cmd != BIT_EXT){
+				// 	cmd = BIT_EXT;
+				// 	Serial1.print('L');
+				// 	Serial1.print(cmd); // 投げる
+				// 	Serial1.print('\n');
+				// }
 
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
-				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
-					// ボタンを押したら投擲を終了して，次のフェーズへ
-					if( !stopRoller ){		// スイッチを最初に押したとき
-						stopRoller = true;
-
-						cmd = BIT_DOWN;
-						Serial1.print('L');
-						Serial1.print(cmd); // ハンド下げる
-						Serial1.print('\n');
-						wait_count = 0;
-					}else{					// スイッチをもう一度押したとき
-						stopRoller = false;
-						//phase = 15;
-						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
-					}
-				}
-				
+							
 			}else if(syusoku == 0){ // 0の時は問題がないとき
 				refVx = motion.refVx;
 				refVy = motion.refVy;
@@ -1101,6 +1112,31 @@ void loop() {
 				refVx = 0.0;
 				refVy = 0.0;
 				refVz = 0.0;
+			}
+
+			if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				// ボタンを押したら投擲を終了して，次のフェーズへ
+				if( swTiming == 0 ){
+					cmd = BIT_EXT;
+					Serial1.print('L');
+					Serial1.print(cmd); // 投げる
+					Serial1.print('\n');
+					swTiming++;
+				}else if( swTiming == 1 ){//if( !stopRoller ){		// スイッチを最初に押したとき
+					stopRoller = true;
+
+					cmd = BIT_DOWN;
+					Serial1.print('L');
+					Serial1.print(cmd); // ハンド下げる
+					Serial1.print('\n');
+					wait_count = 0;
+					swTiming++;
+				}else{					// スイッチをもう一度押したとき
+					stopRoller = false;
+					//phase = 15;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					swTiming = 0;
+				}
 			}
 		
 		///// phase 100  リトライ用　 /////////////////////////////////////////////////////////////////////////			
@@ -1116,17 +1152,27 @@ void loop() {
 				Serial1.print('\n');
 			}
 
-			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+			if(pre_buttonstate == 0x0F && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
+				if(retry_num == 11){
+					gPosiz = 3.14159265;
+					gPosix = -0.5;
+					gPosiy =  0.5;
+				}else if(retry_num == 1){
+					gPosiz = 0.0;
+					gPosix = 0.5;
+					gPosiy = 0.5;
+				}
+
 				phase = 101;
-				digitalWrite(PIN_EXLED1, HIGH);
+				//digitalWrite(PIN_EXLED1, HIGH);
 			}
 		///// phase 101  リトライ用　 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 101){ // 投擲位置まで移動
-			refVx = 0.5; // とりあえずまっすぐ進むだけ
+			refVx = 0.8; // とりあえずまっすぐ進むだけ
 			refVy = 0.0;
 			refVz = 0.0;
 			if(zone == BLUE){
-				if(gPosix >= 1.5){
+				if(gPosix >= 1.7){
 					cmd = BIT_STOR;
 					Serial1.print('L');
 					Serial1.print(cmd); // ゲルゲ展開
@@ -1135,7 +1181,7 @@ void loop() {
 					phase = 2;
 				}
 			}else if(zone == RED){
-				if(gPosix <= -1.5){
+				if(gPosix <= -1.7){
 					cmd = BIT_STOR;
 					Serial1.print('L');
 					Serial1.print(cmd); // ゲルゲ展開
@@ -1377,9 +1423,11 @@ void loop() {
 		Serial.print("\t");
 		Serial.println(motion.calcRefvel(gPosix, gPosiy, gPosiz)); */
 		
-		Serial.println(phase);
+		//Serial.println(pre_buttonstate);
 
-		pre_buttonstate = digitalRead(PIN_BUTTON1);
+		pre_buttonstate = pre_buttonstate<<1;
+		pre_buttonstate &= 0x0F;
+		pre_buttonstate |= !digitalRead(PIN_BUTTON1);
 		flag_10ms = false;
 	}
 
