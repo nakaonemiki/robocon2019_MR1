@@ -46,6 +46,7 @@ public:
 
     double onx, ony;
     double angle, dist;
+    double preAngle = 1.5708;
     double t_be, pre_t_be;
     double dist2goal;
     double epsilon;
@@ -73,6 +74,7 @@ public:
     void incrPathnum(double conv_length, double conv_tnum);
     void setConvPara(double conv_length, double conv_tnum);
     int getPathNum();
+    void setPathNum(int);
 
     void setMode(int);
     int getMode();

@@ -16,7 +16,9 @@
 #define STATE_ALL   ( STATE1 + STATE2 + STATE3 + STATE4 )
 
 // 上半身との通信
-#define BIT_START   ( 0b10010000 ) // 0x90:最初に送る
+// #define BIT_START   ( 0b10010000 ) // 0x90:最初に送る
+#define BIT_RED     ( 0b11010000 )// 赤の初期化
+#define BIT_BLUE    ( 0b10010000 )// 青の初期化
 #define BIT_INIT    ( 0b10001000 )// 
 #define BIT_DOWN    ( 0b10001001 )// シャガイを取るモード
 #define BIT_ROT     ( 0b10001101 )// ローラ回転

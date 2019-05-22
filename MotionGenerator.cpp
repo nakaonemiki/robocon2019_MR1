@@ -43,6 +43,7 @@ MotionGenerator::MotionGenerator(int xmode){
 
 	sokduo_filter.setSecondOrderPara(22.0, 1.0, 0.0);//(15.0, 1.0, 0.0);
     kakudo_filter.setSecondOrderPara(10.0, 1.0, 0.0);//(7.0, 1.0, 0.0);
+   // angle = 2.35619;
 
     mode_changed = true;
     init_done = false;
@@ -129,6 +130,9 @@ void MotionGenerator::calcRefpoint(double Posix, double Posiy){
         // 外積による距離導出
         //double angle;
         angle = atan2(dbezier_y(path_num, t_be), dbezier_x(path_num, t_be)); // ベジエ曲線の接線方向
+        if(fabs(angle - preAngle) > PI){
+            angle += 2 * PI;
+        }
         //double dist;
         dist = (ony - Posiy)*cos(angle) - (onx - Posix)*sin(angle);
 
@@ -253,6 +257,10 @@ void MotionGenerator::incrPathnum(double xconv_length, double xconv_tnum = 0.997
 
 int MotionGenerator::getPathNum(){
     return path_num;
+}
+
+void MotionGenerator::setPathNum(int num){
+    path_num = num;
 }
 
 // 収束判定に用いる距離などをセットする

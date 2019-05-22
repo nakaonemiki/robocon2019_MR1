@@ -23,13 +23,13 @@
 #define PIN_BUTTON1 (49)
 #define PIN_BUTTON2 (50)
 
-#define PIN_BUTTON_NORMAL (44)
-#define PIN_BUTTON_RETRY1 (47)
-#define PIN_BUTTON_RETRY2 (46)
-#define PIN_EXBUTTON1 (45)
+#define PIN_BUTTON_NORMAL (46)
+#define PIN_BUTTON_RETRY1 (48)
+#define PIN_BUTTON_RETRY2 (47)
+//#define PIN_EXBUTTON1 (45)
 
 #define PIN_EXLED1 (25)
-#define PIN_EXLED2 (27)
+//#define PIN_EXLED2 (27)
 
 // 自己位置推定用のエンコーダ
 phaseCounter Enc1(1);
@@ -57,6 +57,7 @@ int EncountA = 0, EncountB = 0, EncountC = 0;
 int pre_EncountA = 0, pre_EncountB = 0, preAngleC = 0;
 int pre_tmpEncA = 0, pre_tmpEncB = 0, pre_tmpEncC = 0;
 int ledcount = 0;
+boolean stopRoller = false;
 
 int count_10ms = 0;//0;
 boolean flag_10ms = false;
@@ -162,10 +163,10 @@ void timer_warikomi(){
 	if(ledcount >= 25) {
 		if(digitalRead(PIN_LED0) == LOW){
 			digitalWrite(PIN_LED0, HIGH);
-			digitalWrite(PIN_EXLED2, LOW);
+			if(phase == 100) digitalWrite(PIN_EXLED1, HIGH);
 		} else {
 			digitalWrite(PIN_LED0, LOW);
-			digitalWrite(PIN_EXLED2, HIGH);
+			if(phase == 100) digitalWrite(PIN_EXLED1, LOW);
 		}
 		ledcount = 0;
 	}
@@ -293,10 +294,10 @@ void setup() {
 	pinMode(PIN_BUTTON_NORMAL, INPUT);
 	pinMode(PIN_BUTTON_RETRY1, INPUT);
 	pinMode(PIN_BUTTON_RETRY2, INPUT);
-	pinMode(PIN_EXBUTTON1, INPUT);
+	//pinMode(PIN_EXBUTTON1, INPUT);
 
 	pinMode(PIN_EXLED1, OUTPUT);
-	pinMode(PIN_EXLED2, OUTPUT);
+	//pinMode(PIN_EXLED2, OUTPUT);
 
 	pinMode(49, INPUT);
 	pinMode(50, INPUT);
@@ -344,67 +345,81 @@ void setup() {
 	mySD.init();
 	Serial.print("Path reading ...");
 	
+	// cmd = BIT_START;
+	// Serial1.print('L');
+	// Serial1.print(cmd); // 初期化
+	// Serial1.print('\n');
+
 	int button_state;
-	/*do{
+	do{
 		button_state = 0;
 		button_state |= !digitalRead(PIN_BUTTON_NORMAL); // 「!」で反転して格納
 		button_state |= !digitalRead(PIN_BUTTON_RETRY1)<<1;
 		button_state |= !digitalRead(PIN_BUTTON_RETRY2)<<2;
-	}while( button_state & 0x07 == 0x00 ); // どのボタンも押されていない限り続ける*/ // これは拡張基板付けたら入れる
-
-	do{
-		button_state = 0;
-		button_state |= !digitalRead(PIN_BUTTON1); // 「!」で反転して格納
-	}while (button_state == 0x00); // この処理は，拡張基板付けたら消す
+	}while( button_state == 0x00 ); // どのボタンも押されていない限り続ける
 
 	int actpathnum;
 	if( !digitalRead(51) ){	// 赤
+		cmd = BIT_RED;
+		Serial1.print('L');
+		Serial1.print(cmd); // 初期化
+		Serial1.print('\n');
+
 		digitalWrite(PIN_RED, HIGH);
 		actpathnum = mySD.path_read(RED, motion.Px, motion.Py, motion.refvel, motion.refangle, motion.acc_mode, motion.acc_count, motion.dec_tbe);
 		Serial.println(actpathnum);
 		//mySD.path_read(RED, Px_SD, Py_SD, refvel_SD, refangle_SD);
 
-		if(button_state & 0x01 == 0x01){
+		if((button_state & 0x01)){
 			// 通常スタート
+			Serial.println("Normal Start at RED zone");
 			retry_num = 10;
 			gPosiz = 2.35619449;
 			phase = 0;
-		}else if(button_state & 0x02 == 0x02){
+		}else if((button_state & 0x02)){
 			// リトライ1
+			Serial.println("Re-start at RED zone");
 			retry_num = 11;
 			gPosiz = 3.14159265;
 			phase = 100;
-		}else if(button_state & 0x04 == 0x04){
+		}/*else if(button_state & 0x04 == 0x04){
 			// リトライ2
 			retry_num = 12;
 			gPosiz = 3.14159265;
 			phase = 100;
-		}
+		}*/
 
 		zone = RED;
 	}else{					// 青
+		cmd = BIT_BLUE;
+		Serial1.print('L');
+		Serial1.print(cmd); // 初期化
+		Serial1.print('\n');
+
 		digitalWrite(PIN_BLUE, HIGH);
 		actpathnum = mySD.path_read(BLUE, motion.Px, motion.Py, motion.refvel, motion.refangle, motion.acc_mode, motion.acc_count, motion.dec_tbe);
 		Serial.print("path num: ");
 		Serial.println(actpathnum);
 		//mySD.path_read(BLUE, Px_SD, Py_SD, refvel_SD, refangle_SD);
 
-		if(button_state & 0x01 == 0x01){
+		if(button_state & 0x01){
 			// 通常スタート
+			Serial.println("Normal Start at BLUE zone");
 			retry_num = 0;
 			gPosiz = 0.785398;//1.5708;//0;
 			phase = 0;
-		}else if(button_state & 0x02 == 0x02){
+		}else if(button_state & 0x02){
 			// リトライ1
+			Serial.println("Re-start at BLUE zone");
 			retry_num = 1;
 			gPosiz = 0.0;
 			phase = 100;
-		}else if(button_state & 0x04 == 0x04){
+		}/*else if(button_state & 0x04 == 0x04){
 			// リトライ2
 			retry_num = 2;
 			gPosiz = 0.0;
 			phase = 100;
-		}
+		}*/
 
 		zone = BLUE;
 	}
@@ -423,11 +438,6 @@ void setup() {
 	motion.initSettings(); // これをやっていないと足回りの指令速度生成しない
 	motion.setConvPara(0.02, 0.997); // 初期化
 	motion.setMaxPathnum(actpathnum); // パス数の最大値
-
-	cmd = BIT_START;
-	Serial1.print('L');
-	Serial1.print(cmd); // 初期化
-	Serial1.print('\n');
 
 	//delay(5000);
 	// タイマー割り込み(とりあえず10ms)
@@ -567,7 +577,7 @@ void loop() {
 			
 			refVz = 0.0;
 
-			if(zone = BLUE){
+			if(zone == BLUE){
 				// サイドのスイッチが押されていた場合
 				if((swState & 0b00000011) == 0b00000011) refVy = 0.0;
 				else refVy = -0.15;
@@ -608,12 +618,12 @@ void loop() {
 				if((swState & 0b00111100) == 0b00111100){
 					wait_count++;
 					if(wait_count >= 50){
-						gPosix = 6.058; // ここは変えてね！
+						gPosix = -6.058; // ここは変えてね！
 						gPosiy = 8.245;
-						gPosiz = 0.0;
+						gPosiz = 3.1415;
 
 						// 次の位置PIDにおける目標値　　ここも変更してね
-						motion.Px[3 * pathNum] = 6.475;
+						motion.Px[3 * pathNum] = -6.475;
 						motion.Py[3 * pathNum] = 8.725;
 
 						motion.incrPathnum(0.02, 0.997);
@@ -807,13 +817,19 @@ void loop() {
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
 				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 					// ボタンを押したら投擲を終了して，次のフェーズへ
-					cmd = BIT_DOWN;
-					Serial1.print('L');
-					Serial1.print(cmd); // ハンド下げる
-					Serial1.print('\n');
-					phase = 11;
-					wait_count = 0;
-					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					if( !stopRoller ){		// スイッチを最初に押したとき
+						stopRoller = true;
+
+						cmd = BIT_DOWN;
+						Serial1.print('L');
+						Serial1.print(cmd); // ハンド下げる
+						Serial1.print('\n');
+						wait_count = 0;
+					}else{					// スイッチをもう一度押したとき
+						stopRoller = false;
+						phase = 11;
+						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					}
 				}
 				
 			}else if(syusoku == 0){ // 0の時は問題がないとき
@@ -933,13 +949,19 @@ void loop() {
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
 				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 					// ボタンを押したら投擲を終了して，次のフェーズへ
-					cmd = BIT_DOWN;
-					Serial1.print('L');
-					Serial1.print(cmd); // ハンド下げる
-					Serial1.print('\n');
-					phase = 15;
-					wait_count = 0;
-					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					if( !stopRoller ){		// スイッチを最初に押したとき
+						stopRoller = true;
+
+						cmd = BIT_DOWN;
+						Serial1.print('L');
+						Serial1.print(cmd); // ハンド下げる
+						Serial1.print('\n');
+						wait_count = 0;
+					}else{					// スイッチをもう一度押したとき
+						stopRoller = false;
+						phase = 15;
+						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					}
 				}
 				
 			}else if(syusoku == 0){ // 0の時は問題がないとき
@@ -1056,13 +1078,19 @@ void loop() {
 				// ボタンが押されていたら，次のフェーズへ　※場合によってはif文の外に出して，強制的に次のフェーズにした方がいいかも？
 				if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 					// ボタンを押したら投擲を終了して，次のフェーズへ
-					cmd = BIT_DOWN;
-					Serial1.print('L');
-					Serial1.print(cmd); // ハンド下げる
-					Serial1.print('\n');
-					//phase = 15;
-					wait_count = 0;
-					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					if( !stopRoller ){		// スイッチを最初に押したとき
+						stopRoller = true;
+
+						cmd = BIT_DOWN;
+						Serial1.print('L');
+						Serial1.print(cmd); // ハンド下げる
+						Serial1.print('\n');
+						wait_count = 0;
+					}else{					// スイッチをもう一度押したとき
+						stopRoller = false;
+						//phase = 15;
+						motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					}
 				}
 				
 			}else if(syusoku == 0){ // 0の時は問題がないとき
@@ -1080,23 +1108,39 @@ void loop() {
 			refVx = 0.0;
 			refVy = 0.0;
 			refVz = 0.0;
+
+			if( cmd != BIT_DEP ){
+				cmd = BIT_DEP;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+
 			if(pre_buttonstate == 0 && digitalRead(PIN_BUTTON1) == 1){ // スイッチの立ち上がりを検出してフェーズ移行
 				phase = 101;
+				digitalWrite(PIN_EXLED1, HIGH);
 			}
 		///// phase 101  リトライ用　 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 101){ // 投擲位置まで移動
-			if(retry_num == 1 || retry_num == 2){
-				refVx = 0.5; // とりあえずまっすぐ進むだけ
-				refVy = 0.0;
-				refVz = 0.0;
-				if(gPosix >= 2.0){
+			refVx = 0.5; // とりあえずまっすぐ進むだけ
+			refVy = 0.0;
+			refVz = 0.0;
+			if(zone == BLUE){
+				if(gPosix >= 1.5){
+					cmd = BIT_STOR;
+					Serial1.print('L');
+					Serial1.print(cmd); // ゲルゲ展開
+					Serial1.print('\n');
+					motion.setPathNum(11);
 					phase = 2;
 				}
-			}else if(retry_num == 11 || retry_num == 12){
-				refVx = -0.5; // とりあえずまっすぐ進むだけ
-				refVy = 0.0;
-				refVz = 0.0;
-				if(gPosix <= -2.0){
+			}else if(zone == RED){
+				if(gPosix <= -1.5){
+					cmd = BIT_STOR;
+					Serial1.print('L');
+					Serial1.print(cmd); // ゲルゲ展開
+					Serial1.print('\n');
+					motion.setPathNum(11);
 					phase = 2;
 				}
 			}
@@ -1332,7 +1376,8 @@ void loop() {
 		Serial.print(gPosiy, 4);
 		Serial.print("\t");
 		Serial.println(motion.calcRefvel(gPosix, gPosiy, gPosiz)); */
-		Serial.println(digitalRead(PIN_BUTTON1));
+		
+		Serial.println(phase);
 
 		pre_buttonstate = digitalRead(PIN_BUTTON1);
 		flag_10ms = false;
