@@ -645,6 +645,12 @@ void loop() {
 		else if(phase == 3){ // 位置制御で壁から離れる
 			if(motion.getMode() != POSITION_PID) motion.setMode(POSITION_PID);
 
+			// リトライの時は速度を上げる
+			if(retry_num == 1 || retry_num == 11){
+				motion.refvel[pathNum] = 1.2;
+				motion.acc_count[pathNum] = 80;
+			}
+
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
 				motion.Px[3*pathNum+3] = gPosix;
@@ -693,6 +699,12 @@ void loop() {
 			}
 
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
+
+			if(retry_num == 1 || retry_num == 11){
+				motion.refvel[pathNum] = 0.9;
+				motion.acc_count[pathNum] = 15;
+				motion.dec_tbe[pathNum] = 0.7;
+			}
 			
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
@@ -736,6 +748,12 @@ void loop() {
 		}else if(phase == 7){ // スローイングゾーン前まで移動
 			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 指定した方向を向くモードになっていなかったら変更
 			
+			if(retry_num == 1 || retry_num == 11){
+				motion.refvel[pathNum] = 0.9;
+				motion.acc_count[pathNum] = 15;
+				motion.dec_tbe[pathNum] = 0.7;
+			}
+
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			if(syusoku == 1){
 				if( pathNum <= STATE3 ){
