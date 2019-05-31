@@ -647,7 +647,7 @@ void loop() {
 
 			// リトライの時は速度を上げる
 			if(retry_num == 1 || retry_num == 11){
-				motion.refvel[pathNum] = 1.2;
+				motion.refvel[pathNum] = 1.0;//1.2;
 				motion.acc_count[pathNum] = 80;
 			}
 
