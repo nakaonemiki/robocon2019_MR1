@@ -301,3 +301,12 @@ void MotionGenerator::setYokozurePIDPara(float xKp, float xKi, float xKd){
 void MotionGenerator::setKakudoPIDPara(float xKp, float xKi, float xKd){
     kakudoPID.setPara(xKp, xKi, xKd);
 }
+
+
+void MotionGenerator::kakudoPIDinit(double Posiz){
+    kakudoPID.PIDinit(refKakudo, Posiz);
+}
+
+void MotionGenerator::setRefKakudo(){
+    refKakudo = refangle[path_num];
+}

@@ -214,7 +214,6 @@ void timer_warikomi(){
 		double rho = sqrt(pow(Posixrc, 2.0) + pow(Posiyrc, 2.0));
 		// Posixrc, Posiyrcを回転中心として，前の座標から今の座標までの円周
 		double deltaL = rho * Posiz;
-
 		// グローバル用(zは角度)
 		
 		//gPosix += Posix * cos( gPosiz ) - Posiy * sin( gPosiz );//Posix * cos( tmp_Posiz ) - Posiy * sin( tmp_Posiz );
@@ -324,7 +323,6 @@ void setup() {
 		pinMode(VL53L0X_GPIO[i], OUTPUT);
 		digitalWrite(VL53L0X_GPIO[i], LOW);
 	}
-
 	for (int i = 0; i < SENSOR_NUM; i++) {
 		// センサを初期化
 		pinMode(VL53L0X_GPIO[i], INPUT);
@@ -545,6 +543,7 @@ void loop() {
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+					motion.setRefKakudo();
 
 					if( pathNum == STATE1_1 ) phase = 20;
 				}
@@ -611,10 +610,14 @@ void loop() {
 			}
 			// ----------------------------------上半身との通信----------------------------------
 
-			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 接線方向を向くのではなく，指定した角度で
-			
-			//syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
-			
+			if(zone == BLUE){
+				refVy = -0.15;
+				refVx = 0.0;
+			}else{
+				refVy = 0.15;
+				refVx = 0.0;
+			}
+
 			if( (!digitalRead(A0) && !digitalRead(A1)) || (!digitalRead(A4) && !digitalRead(A5)) ){
 				if( pathNum <= STATE1_3 ){
 					motion.Px[3*pathNum+3] = gPosix;
@@ -624,6 +627,22 @@ void loop() {
 					if( pathNum == STATE1_3 ) phase = 22;//phase = 2;
 				}
 			}
+
+			// if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 接線方向を向くのではなく，指定した角度で
+			
+			// if( (!digitalRead(A0) && !digitalRead(A1)) || (!digitalRead(A4) && !digitalRead(A5)) ){
+			// 	if( pathNum <= STATE1_3 ){
+			// 		motion.Px[3*pathNum+3] = gPosix;
+			// 		motion.Py[3*pathNum+3] = gPosiy;
+			// 		motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+			// 		if( pathNum == STATE1_3 ) phase = 22;//phase = 2;
+			// 	}
+			// }else{
+			// 	refVx = motion.refVx;
+			// 	refVy = motion.refVy;
+			// 	refVz = motion.refVz;
+			// }
 		///// phase 22 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 22){
 			// ----------------------------------上半身との通信----------------------------------
@@ -637,22 +656,21 @@ void loop() {
 
 			if(zone == BLUE){
 				refVy = 0.0;
-				refVx = 0.15;
+				refVx = 0.7;
 			}else{
 				refVy = 0.0;
-				refVx = 0.15;
+				refVx = 0.7;
 			}
 
 			if( fabs(gPosix) > 5.5 ){
-				if( pathNum <= STATE1_3 ){
+				if( pathNum <= STATE1_4 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
-					if( pathNum == STATE1_3 ) phase = 2;//phase = 2;
+					if( pathNum == STATE1_4 ) phase = 2;
 				}
 			}
-			
 		///// phase 2 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 2){ // じわじわ動いて位置補正
 			if( cmd != BIT_STOR ){

@@ -86,6 +86,8 @@ public:
     void setPosiPIDzPara(float xKp, float xKi, float xKd);
     void setYokozurePIDPara(float xKp, float xKi, float xKd);
     void setKakudoPIDPara(float xKp, float xKi, float xKd);
+    void kakudoPIDinit(double Posiz);
+    void setRefKakudo();
 
 private:
     int path_num;
