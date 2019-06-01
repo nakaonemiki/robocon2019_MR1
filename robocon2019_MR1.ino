@@ -541,12 +541,12 @@ void loop() {
 			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
 			
 			if(syusoku == 1){
-				if( pathNum <= STATE1 ){
+				if( pathNum <= STATE1_1 ){
 					motion.Px[3*pathNum+3] = gPosix;
 					motion.Py[3*pathNum+3] = gPosiy;
 					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
 
-					if( pathNum == STATE1 ) phase = 2;
+					if( pathNum == STATE1_1 ) phase = 20;
 				}
 			}else if(syusoku == 0){ // 0の時は問題がないとき
 				refVx = motion.refVx;
@@ -558,9 +558,109 @@ void loop() {
 				refVz = 0.0;
 			}
 			
+		///// phase 20 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 20){
+			// ----------------------------------上半身との通信----------------------------------
+			if( pathNum == 8 && cmd != BIT_DEP ){
+				cmd = BIT_DEP;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}else if( pathNum == 10 && cmd != BIT_STOR ){
+				cmd = BIT_STOR;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+			// ----------------------------------上半身との通信----------------------------------
+
+			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 接線方向を向くのではなく，指定した角度で
+			
+			syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			
+			if(syusoku == 1){
+				if( pathNum <= STATE1_2 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE1_2 ) phase = 21;//phase = 2;
+				}
+			}else if(syusoku == 0){ // 0の時は問題がないとき
+				refVx = motion.refVx;
+				refVy = motion.refVy;
+				refVz = motion.refVz;
+			}else{ // それ以外は問題ありなので止める
+				refVx = 0.0;
+				refVy = 0.0;
+				refVz = 0.0;
+			}
+		///// phase 21 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 21){
+			// ----------------------------------上半身との通信----------------------------------
+			if( pathNum == 8 && cmd != BIT_DEP ){
+				cmd = BIT_DEP;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}else if( pathNum == 10 && cmd != BIT_STOR ){
+				cmd = BIT_STOR;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+			// ----------------------------------上半身との通信----------------------------------
+
+			if(motion.getMode() != FOLLOW_COMMAND) motion.setMode(FOLLOW_COMMAND); // 接線方向を向くのではなく，指定した角度で
+			
+			//syusoku = motion.calcRefvel(gPosix, gPosiy, gPosiz); // 収束していれば　1　が返ってくる
+			
+			if( (!digitalRead(A0) && !digitalRead(A1)) || (!digitalRead(A4) && !digitalRead(A5)) ){
+				if( pathNum <= STATE1_3 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE1_3 ) phase = 22;//phase = 2;
+				}
+			}
+		///// phase 22 /////////////////////////////////////////////////////////////////////////
+		}else if(phase == 22){
+			// ----------------------------------上半身との通信----------------------------------
+			if( pathNum == 8 && cmd != BIT_DEP ){
+				cmd = BIT_DEP;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
+			// ----------------------------------上半身との通信----------------------------------
+
+			if(zone == BLUE){
+				refVy = 0.0;
+				refVx = 0.15;
+			}else{
+				refVy = 0.0;
+				refVx = 0.15;
+			}
+
+			if( fabs(gPosix) > 5.5 ){
+				if( pathNum <= STATE1_3 ){
+					motion.Px[3*pathNum+3] = gPosix;
+					motion.Py[3*pathNum+3] = gPosiy;
+					motion.incrPathnum(0.02, 0.997); // 次の曲線へ．括弧の中身は収束に使う数値
+
+					if( pathNum == STATE1_3 ) phase = 2;//phase = 2;
+				}
+			}
+			
 		///// phase 2 /////////////////////////////////////////////////////////////////////////
 		}else if(phase == 2){ // じわじわ動いて位置補正
-			
+			if( cmd != BIT_STOR ){
+				cmd = BIT_STOR;
+				Serial1.print('L');
+				Serial1.print(cmd); // ゲルゲ展開
+				Serial1.print('\n');
+			}
 			// refVx = 0.0;
 			// refVy = 0.0;
 			// refVz = 0.0;

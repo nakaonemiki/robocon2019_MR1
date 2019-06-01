@@ -4,7 +4,11 @@
 #define INT_TIME			( 0.01 )//( 0.001 )
 
 // フェーズ管理
-#define STATE1      ( 10 )// スタートからゲルゲ受け渡しまで(0から数えて)
+//#define STATE1      ( 10 )// スタートからゲルゲ受け渡しまで(0から数えて)
+#define STATE1_1    ( 7 )// ベジエTANGENTモード
+#define STATE1_2    ( 8 )// ベジエCOMMANDモード
+#define STATE1_3    ( 9 )// ベジエCOMMANDモード(フェーズの変更は収束判定ではなくリミットスイッチで)
+#define STATE1_4    ( 10 )// 使うか分からないけど
 #define STATE2      ( 14 )// ゲルゲ受け渡し後からシャガイ取得まで
 #define STATE3      ( 15 )// シャガイ取得後からスローイングゾーン待機まで
 #define STATE4      ( 17 )// 投擲位置まで移動
